@@ -1,17 +1,4 @@
-#Binary Files
-*.bin
-*.sys
-
-#The images
-*.img
-*.qcow2
-*.vmdk
-
-#Object files
-*.o
-.bash_history
-
-# Archivos generados durante la compilacion
+# Archivos generados durante la compilación
 *.o
 *.obj
 *.bin
@@ -24,7 +11,7 @@
 *.map
 *.log
 
-# Archivos temporales y configuraciones locales
+# Archivos temporales
 *.tmp
 *.swp
 *~
@@ -32,9 +19,9 @@
 Thumbs.db
 .bash_history
 *:Zone.Identifier
+
+# Configuración local de editores
 .vscode/
 .idea/
-
-# Archivos de configuracion de Sublime Text
 *.sublime-project
 *.sublime-workspace
