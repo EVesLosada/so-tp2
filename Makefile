@@ -49,4 +49,6 @@ run:
 	$(QEMU) \
 		-drive file=$(OS_IMAGE),format=raw \
 		-m 512 \
-		-vga std
+		-vga std \
+		-audiodev pa,id=snd0 \
+		-machine pcspk-audiodev=snd0
