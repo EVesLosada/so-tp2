@@ -1,7 +1,7 @@
 
 .DEFAULT_GOAL := all
 
-.PHONY: all toolchain bootloader kernel userland image clean docker
+.PHONY: all toolchain bootloader kernel userland image clean docker run
 
 all: image
 
@@ -39,3 +39,14 @@ docker:
 		-w /src \
 		$(DOCKER_IMAGE) \
 		bash
+
+	
+# Ejecucion del sistema en QEMU
+QEMU := qemu-system-x86_64
+OS_IMAGE := Image/x64BareBonesImage.img
+
+run:
+	$(QEMU) \
+		-drive file=$(OS_IMAGE),format=raw \
+		-m 512 \
+		-vga std
