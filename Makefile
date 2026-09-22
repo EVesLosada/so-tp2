@@ -1,7 +1,7 @@
 
 .DEFAULT_GOAL := all
 
-.PHONY: all toolchain bootloader kernel userland image clean
+.PHONY: all toolchain bootloader kernel userland image clean docker
 
 all: image
 
@@ -26,3 +26,16 @@ clean:
 	$(MAKE) -C Kernel clean
 	$(MAKE) -C Userland clean
 	$(MAKE) -C Toolchain clean
+
+
+# Entorno de compilación obligatorio de SO
+DOCKER_IMAGE := agodio/itba-so-multiarch:3.1
+
+docker:
+	docker run --rm -it \
+		--user $(shell id -u):$(shell id -g) \
+		-e HOME=/tmp \
+		-v "$(CURDIR):/src" \
+		-w /src \
+		$(DOCKER_IMAGE) \
+		bash
