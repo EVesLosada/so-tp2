@@ -1,55 +1,40 @@
-# Prerequisites
-*.d
+#Binary Files
+*.bin
+*.sys
 
-# Object files
+#The images
+*.img
+*.qcow2
+*.vmdk
+
+#Object files
 *.o
-*.ko
+.bash_history
+
+# Archivos generados durante la compilacion
+*.o
 *.obj
+*.bin
 *.elf
-
-# Linker output
-*.ilk
+*.sys
+*.img
+*.iso
+*.qcow2
+*.vmdk
 *.map
-*.exp
+*.log
 
-# Precompiled Headers
-*.gch
-*.pch
+# Archivos temporales y configuraciones locales
+*.tmp
+*.swp
+*~
+.DS_Store
+Thumbs.db
+.bash_history
+*:Zone.Identifier
+.vscode/
+.idea/
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
-
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
-
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
-
-# debug information files
-*.dwo
+# Archivos de configuracion de Sublime Text
+*.sublime-project
+*.sublime-workspace
