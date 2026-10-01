@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <syscall_ids.h>
+#include <syscall_types.h>
 
 #define STDIN  0
 #define STDOUT 1

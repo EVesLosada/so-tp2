@@ -5,11 +5,12 @@
 #include <stdint.h>
 #include <registers.h>
 #include <syscall_ids.h>
+#include <syscall_types.h>
 
 /*
- * Convencion de argumentos:
+ * Convencion de system calls:
  *
- * RAX = numero de syscall
+ * RAX = identificador de syscall
  * RDI = primer argumento
  * RSI = segundo argumento
  * RDX = tercer argumento
@@ -18,6 +19,9 @@
  *
  * Retorno:
  * RAX = valor devuelto por la syscall
+ *
+ * Los punteros recibidos desde Userland solo se utilizan
+ * para intercambiar datos a traves de la interfaz de syscalls.
  */
 uint64_t syscallDispatcher(RegisterFrame *frame);
 
