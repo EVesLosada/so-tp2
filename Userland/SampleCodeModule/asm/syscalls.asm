@@ -1,3 +1,5 @@
+%include "syscall_ids.inc"
+
 GLOBAL sysWrite
 GLOBAL sysRead
 GLOBAL sysClear
@@ -16,55 +18,55 @@ section .text
 
 ; uint64_t sysWrite(uint64_t fd, const char *buffer, uint64_t count)
 sysWrite:
-    mov rax, 1
+    mov rax, SYS_WRITE
     int 0x80
     ret
 
 ; uint64_t sysRead(uint64_t fd, char *buffer, uint64_t count)
 sysRead:
-    mov rax, 2
+    mov rax, SYS_READ
     int 0x80
     ret
 
 ; uint64_t sysClear(void)
 sysClear:
-    mov rax, 3
+    mov rax, SYS_CLEAR
     int 0x80
     ret
 
 ; uint64_t sysFontUp(void)
 sysFontUp:
-    mov rax, 4
+    mov rax, SYS_FONT_UP
     int 0x80
     ret
 
 ; uint64_t sysFontDown(void)
 sysFontDown:
-    mov rax, 5
+    mov rax, SYS_FONT_DOWN
     int 0x80
     ret
 
 ; uint64_t sysGetRegisters(RegisterFrame *registers)
 sysGetRegisters:
-    mov rax, 6
+    mov rax, SYS_GET_REGS
     int 0x80
     ret
 
 ; uint64_t sysGetTicks(void)
 sysGetTicks:
-    mov rax, 7
+    mov rax, SYS_GET_TICKS
     int 0x80
     ret
 
 ; uint64_t sysDrawRect(uint32_t color, uint64_t x, uint64_t y, uint64_t width, uint64_t height)
 sysDrawRect:
-    mov rax, 8
+    mov rax, SYS_DRAW_RECT
     int 0x80
     ret
 
 ; uint64_t sysBeep(uint32_t frequency, uint64_t durationTicks)
 sysBeep:
-    mov rax, 9
+    mov rax, SYS_BEEP
     int 0x80
     ret
 
@@ -74,21 +76,20 @@ sysBeep:
 ;   RDI = hours
 ;   RSI = minutes
 ;   RDX = seconds
-
 sysGetTime:
-    mov rax, 10
+    mov rax, SYS_GET_TIME
     int 0x80
-    ret 
+    ret
 
 ; uint64_t sysSetHash(uint64_t hash)
 sysSetHash:
-    mov rax, 11
+    mov rax, SYS_SET_HASH
     int 0x80
     ret
 
 ; uint64_t sysGetHash(uint64_t *hash)
 sysGetHash:
-    mov rax, 12
+    mov rax, SYS_GET_HASH
     int 0x80
     ret
 
@@ -101,6 +102,6 @@ sysGetHash:
 ;   RSI = resultBufferSize
 ;   RDX = elapsedCycles
 sysCrack:
-    mov rax, 13
+    mov rax, SYS_CRACK
     int 0x80
     ret
