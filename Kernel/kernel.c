@@ -7,6 +7,7 @@
 #include <terminal.h>
 #include <interrupts.h>
 #include <memoryLayout.h>
+#include <memoryRegion.h>
 
 extern uint8_t text;
 extern uint8_t rodata;
@@ -14,6 +15,12 @@ extern uint8_t data;
 extern uint8_t bss;
 extern uint8_t endOfKernelBinary;
 extern uint8_t endOfKernel;
+/*
+ * Region que podra utilizar el administrador de memoria.
+ * Se calcula durante el arranque, luego de limpiar BSS.
+ */
+static MemoryRegion availableMemoryRegion;
+static uint8_t memoryRegionReady;
 
 static void * const sampleCodeModuleAddress = (void *)USERLAND_MODULE_ADDRESS;
 
@@ -54,7 +61,8 @@ void * initializeKernelBinary()
 		sampleDataModuleAddress
 	};
 
-	loadModules(&endOfKernelBinary, moduleAddresses);
+	uint64_t reservedEnd =
+    	loadModules(&endOfKernelBinary, moduleAddresses);
 	ncPrint("[Done]");
 	ncNewline();
 	ncNewline();
@@ -63,6 +71,24 @@ void * initializeKernelBinary()
 	ncNewline();
 
 	clearBSS(&bss, &endOfKernel - &bss);
+	/*
+	* Reservar tambien las paginas del stack inicial.
+	* El limite superior es exclusivo.
+	*/
+	uint64_t kernelStackEnd =
+		(uint64_t)&endOfKernel +
+		PAGE_SIZE * KERNEL_STACK_PAGES;
+
+	if (kernelStackEnd > reservedEnd) {
+		reservedEnd = kernelStackEnd;
+	}
+
+	/*
+	* Seleccionar memoria fisica utilizable por encima
+	* de todas las regiones ocupadas por el sistema.
+	*/
+	memoryRegionReady =
+		selectMemoryRegion(reservedEnd, &availableMemoryRegion);
 
 	ncPrint("  text: 0x");
 	ncPrintHex((uint64_t)&text);
@@ -87,6 +113,14 @@ int main()
 {
         //La terminal pertenece al kernel porque escribe en video.
         terminalInit();
+
+		if (!memoryRegionReady) {
+			terminalPrint("Error: no se encontro memoria fisica segura.\n");
+
+			while (1) {
+				__asm__ volatile ("cli; hlt");
+			}
+		}
 
         //Registramos int 80h para que Userland pueda solicitar servicios.
         initializeInterrupts();
