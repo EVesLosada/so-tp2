@@ -4,12 +4,13 @@
 #include <stdint.h>
 
 /*
- * Pure64 deja una copia del mapa de memoria E820 a partir
- * de la direccion fisica 0x4000.
+ * Pure64 deja el mapa E820 a partir de la direccion 0x4000.
  *
- * Cada entrada ocupa 24 bytes.
+ * Cada entrada contiene 24 bytes de informacion, pero
+ * Pure64 reserva 32 bytes por entrada.
  */
 #define E820_MAP_ADDRESS 0x4000UL
+#define E820_ENTRY_STRIDE 32UL
 
 #define E820_TYPE_USABLE 1U
 

@@ -55,13 +55,14 @@ goodent:
 	inc bp				; got a good entry: ++count, move to next storage spot
 	add di, 32
 skipent:
-	test ebx, ebx			; if ebx resets to 0, list is complete
-	jne e820lp
+        test ebx, ebx                   ; if ebx resets to 0, list is complete
+        jne e820lp
+        jmp memmapend                   ; E820 finished successfully
 nomemmap:
-	mov byte [cfg_e820], 0		; No memory map function
+        mov byte [cfg_e820], 0          ; No memory map function
 memmapend:
-	xor eax, eax			; Create a blank record for termination (32 bytes)
-	mov ecx, 8
+        xor eax, eax                    ; Create a blank record for termination (32 bytes)
+        mov ecx, 8
 	rep stosd
 
 ; Enable the A20 gate

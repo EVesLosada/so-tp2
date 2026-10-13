@@ -3,10 +3,11 @@
 
 const E820Entry *getE820Entry(uint64_t index)
 {
-    const E820Entry *memoryMap =
-        (const E820Entry *)E820_MAP_ADDRESS;
+    const uint8_t *memoryMap =
+        (const uint8_t *)E820_MAP_ADDRESS;
 
-    return &memoryMap[index];
+    return (const E820Entry *)
+        (memoryMap + index * E820_ENTRY_STRIDE);
 }
 
 uint8_t isE820End(const E820Entry *entry)
