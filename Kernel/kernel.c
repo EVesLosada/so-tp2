@@ -8,6 +8,7 @@
 #include <interrupts.h>
 #include <memoryLayout.h>
 #include <memoryRegion.h>
+#include <memoryManager.h>
 
 extern uint8_t text;
 extern uint8_t rodata;
@@ -121,6 +122,15 @@ int main()
 				__asm__ volatile ("cli; hlt");
 			}
 		}
+
+		/*
+		* Inicializar el administrador Free List utilizando
+		* la region fisica segura seleccionada durante el arranque.
+		*/
+		initializeMemoryManager(
+			availableMemoryRegion.start,
+			availableMemoryRegion.size
+		);
 
         //Registramos int 80h para que Userland pueda solicitar servicios.
         initializeInterrupts();
