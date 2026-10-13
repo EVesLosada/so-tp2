@@ -62,7 +62,7 @@ void * initializeKernelBinary()
 	};
 
 	uint64_t reservedEnd =
-    	loadModules(&endOfKernelBinary, moduleAddresses);
+	loadModules(&endOfKernelBinary, moduleAddresses);
 	ncPrint("[Done]");
 	ncNewline();
 	ncNewline();
