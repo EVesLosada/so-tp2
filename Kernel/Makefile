@@ -1,8 +1,19 @@
 include Makefile.inc
 
 KERNEL=kernel.bin
+# Administrador de memoria seleccionado.
+# Por defecto se utiliza Free List.
+MEMORY_MANAGER ?= freelist
 
-SOURCES=$(wildcard *.c) \
+ifeq ($(MEMORY_MANAGER),freelist)
+MEMORY_MANAGER_SOURCE := memoryManager.c
+else ifeq ($(MEMORY_MANAGER),buddy)
+MEMORY_MANAGER_SOURCE := allocators/buddyMemoryManager.c
+else
+$(error MEMORY_MANAGER debe ser freelist o buddy)
+endif
+SOURCES=$(filter-out memoryManager.c,$(wildcard *.c)) \
+        $(MEMORY_MANAGER_SOURCE) \
         $(wildcard drivers/*.c) \
         $(wildcard idt/*.c) \
         $(wildcard syscalls/*.c) \
@@ -20,7 +31,7 @@ STATICLIBS=
 
 all: $(KERNEL)
 
-$(KERNEL): $(LOADEROBJECT) $(OBJECTS) $(STATICLIBS) $(OBJECTS_ASM)
+$(KERNEL): $(LOADEROBJECT) $(OBJECTS) $(STATICLIBS) $(OBJECTS_ASM) FORCE
 	$(LD) $(LDFLAGS) -T kernel.ld -o $(KERNEL) $(LOADEROBJECT) $(OBJECTS) $(OBJECTS_ASM) $(STATICLIBS)
 
 %.o: %.c
@@ -35,5 +46,6 @@ $(LOADEROBJECT):
 clean:
 	rm -rf *.o *.bin
 	rm -rf drivers/*.o idt/*.o syscalls/*.o time/*.o cracker/*.o asm/*.o
+	rm -f allocators/*.o
 
-.PHONY: all clean
+.PHONY: all clean FORCE
