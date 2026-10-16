@@ -53,4 +53,8 @@ uint64_t sysGetHash(uint64_t *hash);
 uint64_t sysCrack(char *resultBuffer,
                   uint64_t resultBufferSize,
                   uint64_t *elapsedCycles);
+
+void *sysMalloc(uint64_t size);
+void sysFree(void *ptr);
+uint64_t sysMemInfo(MemoryInfo *info);
 #endif

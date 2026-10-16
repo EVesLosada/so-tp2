@@ -7,6 +7,7 @@
 #include <sound.h>
 #include <rtc.h>
 #include <cracker.h>
+#include <memoryManager.h>
 
 #define STDIN  0
 #define STDOUT 1
@@ -271,7 +272,39 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
                 frame->rsi,
                 (uint64_t *) frame->rdx
             );
-            
+
+        /*
+         * Reservar memoria dinamica.
+         *
+         * RDI = cantidad de bytes solicitados.
+         * RAX = direccion reservada o NULL.
+         */
+        case SYS_MALLOC:
+            return (uint64_t)allocateMemory(frame->rdi);
+
+        /*
+         * Liberar un bloque previamente reservado.
+         *
+         * RDI = direccion del bloque.
+         */
+        case SYS_FREE:
+            freeMemory((void *)(uintptr_t)frame->rdi);
+            return 0;
+
+        /*
+         * Consultar el estado de la memoria.
+         *
+         * RDI = puntero a MemoryInfo.
+         * RAX = 1 si se completo la consulta, 0 si es NULL.
+         */
+        case SYS_MEM_INFO:
+            if (frame->rdi == 0) {
+                return 0;
+            }
+
+            getMemoryInfo((MemoryInfo *)(uintptr_t)frame->rdi);
+            return 1;
+
         default:
             return 0;
     }

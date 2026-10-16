@@ -13,6 +13,9 @@ GLOBAL sysGetTime
 GLOBAL sysSetHash
 GLOBAL sysGetHash
 GLOBAL sysCrack
+GLOBAL sysMalloc
+GLOBAL sysFree
+GLOBAL sysMemInfo
 
 section .text
 
@@ -103,5 +106,28 @@ sysGetHash:
 ;   RDX = elapsedCycles
 sysCrack:
     mov rax, SYS_CRACK
+    int 0x80
+    ret
+
+; void *sysMalloc(uint64_t size)
+; RDI = cantidad de bytes solicitados
+; RAX = puntero reservado o NULL
+sysMalloc:
+    mov rax, SYS_MALLOC
+    int 0x80
+    ret
+
+; void sysFree(void *ptr)
+; RDI = puntero a liberar
+sysFree:
+    mov rax, SYS_FREE
+    int 0x80
+    ret
+
+; uint64_t sysMemInfo(MemoryInfo *info)
+; RDI = destino de las estadisticas
+; RAX = 1 si tuvo exito, 0 si fallo
+sysMemInfo:
+    mov rax, SYS_MEM_INFO
     int 0x80
     ret
