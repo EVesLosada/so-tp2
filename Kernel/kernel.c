@@ -9,6 +9,7 @@
 #include <memoryLayout.h>
 #include <memoryRegion.h>
 #include <memoryManager.h>
+#include <processManager.h>
 
 extern uint8_t text;
 extern uint8_t rodata;
@@ -131,6 +132,12 @@ int main()
 			availableMemoryRegion.start,
 			availableMemoryRegion.size
 		);
+
+		/*
+		* Inicializar la tabla y el administrador de procesos.
+		* Todavia no se crean ni ejecutan procesos nuevos.
+		*/
+		initializeProcessManager();
 
         //Registramos int 80h para que Userland pueda solicitar servicios.
         initializeInterrupts();
