@@ -42,6 +42,16 @@ typedef struct Process {
     void (*entryPoint)(void);
 
     /*
+    * Punto de entrada para procesos con argumentos.
+    *
+    * argv apuntara a una copia de los argumentos
+    * almacenada en memoria propia del proceso.
+    */
+    void (*entryPointWithArgs)(uint64_t argc, char **argv);
+    uint64_t argc;
+    char **argv;
+
+    /*
      * Relacion con otros procesos.
      */
     uint64_t parentPid;
