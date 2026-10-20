@@ -41,4 +41,31 @@ uint64_t createProcessWithArgs(
     const char *const argv[]
 );
 
+/*
+ * Busca el siguiente proceso listo para ejecutar.
+ *
+ * Recorre la tabla de forma circular.
+ * Retorna NULL si no hay procesos READY.
+ *
+ * No modifica los estados de los procesos.
+ */
+Process *selectNextReadyProcess(void);
+
+/*
+ * Devuelve el proceso actualmente en ejecucion.
+ * Retorna NULL si todavia no hay uno.
+ */
+Process *getCurrentProcess(void);
+
+/**
+ * @brief Selecciona el contexto que debe ejecutarse a continuación.
+ *
+ * Recibe el puntero al stack del contexto interrumpido y devuelve
+ * el puntero al stack del contexto que se debe restaurar.
+ *
+ * @param savedRsp Puntero al stack con los registros guardados.
+ * @return Puntero al stack del contexto seleccionado.
+ */
+uint64_t schedule(uint64_t savedRsp);
+
 #endif

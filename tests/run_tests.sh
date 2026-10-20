@@ -61,5 +61,17 @@ run_test test_process_args_buddy \
     Kernel/processTable.c \
     Kernel/allocators/buddyMemoryManager.c
 
+run_test test_process_table \
+  tests/test_process_table.c \
+  Kernel/processTable.c \
+  Kernel/processManager.c \
+  Kernel/memoryManager.c
+
+run_test test_scheduler \
+  tests/test_scheduler.c \
+  Kernel/processTable.c \
+  Kernel/processManager.c \
+  Kernel/memoryManager.c
+
 echo
 echo "OK: todos los tests auxiliares superados"

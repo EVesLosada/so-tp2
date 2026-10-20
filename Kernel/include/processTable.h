@@ -40,6 +40,14 @@ Process *findProcessByPid(uint64_t pid);
 uint8_t unregisterProcess(uint64_t pid);
 
 /*
+ * Devuelve el proceso ubicado en una posicion de la tabla.
+ *
+ * Retorna NULL si el indice es invalido
+ * o si la posicion esta vacia.
+ */
+Process *getProcessAt(uint64_t index);
+
+/*
  * Cantidad de procesos actualmente
  * registrados en la tabla.
  */

@@ -15,6 +15,10 @@
 #define MIN_EXECUTION_STACK 4096ULL
 
 static uint64_t nextPid = 1;
+static uint64_t nextProcessIndex = 0;
+static Process *currentProcess = NULL;
+// Contexto de la shell, que todavía se ejecuta sin PCB.
+static uint64_t shellSavedStackPointer = 0;
 
 /*
  * Punto de entrada inicial de todos los procesos.
@@ -39,6 +43,9 @@ static void processBootstrap(Process *process) {
 void initializeProcessManager(void) {
     initializeProcessTable();
     nextPid = 1;
+    nextProcessIndex = 0;
+    currentProcess = NULL;
+    shellSavedStackPointer = 0;
 }
 
 /*
@@ -279,4 +286,89 @@ uint64_t createProcessWithArgs(
         argc,
         argv
     );
+}
+
+Process *selectNextReadyProcess(void) {
+    for (uint64_t checked = 0; checked < MAX_PROCESSES; checked++) {
+        uint64_t index =
+            (nextProcessIndex + checked) % MAX_PROCESSES;
+
+        Process *process = getProcessAt(index);
+
+        if (process != NULL && process->state == PROCESS_READY) {
+            nextProcessIndex = (index + 1) % MAX_PROCESSES;
+            return process;
+        }
+    }
+
+    return NULL;
+}
+
+Process *getCurrentProcess(void) {
+    return currentProcess;
+}
+
+uint64_t schedule(uint64_t savedRsp) {
+    Process *previousProcess = currentProcess;
+
+    // Estamos ejecutando la shell, que no tiene PCB.
+    if (previousProcess == NULL) {
+        shellSavedStackPointer = savedRsp;
+
+        Process *nextProcess = selectNextReadyProcess();
+
+        if (nextProcess == NULL) {
+            return savedRsp;
+        }
+
+        nextProcess->state = PROCESS_RUNNING;
+        currentProcess = nextProcess;
+
+        return nextProcess->savedStackPointer;
+    }
+
+    // Guardamos el contexto del proceso interrumpido.
+    previousProcess->savedStackPointer = savedRsp;
+
+    // Solo un proceso RUNNING puede volver a READY.
+    if (previousProcess->state == PROCESS_RUNNING) {
+        previousProcess->state = PROCESS_READY;
+    }
+
+    // Alternamos con la shell para que no quede sin CPU.
+    if (shellSavedStackPointer != 0 &&
+        previousProcess->state == PROCESS_READY) {
+        currentProcess = NULL;
+        return shellSavedStackPointer;
+    }
+
+    Process *nextProcess = selectNextReadyProcess();
+
+    // Si hay otro proceso listo, lo ejecutamos.
+    if (nextProcess != NULL) {
+        nextProcess->state = PROCESS_RUNNING;
+        currentProcess = nextProcess;
+
+        return nextProcess->savedStackPointer;
+    }
+
+    // Si el proceso anterior sigue listo, puede continuar.
+    if (previousProcess->state == PROCESS_READY) {
+        previousProcess->state = PROCESS_RUNNING;
+        return savedRsp;
+    }
+
+    // El proceso anterior no puede seguir ejecutandose.
+    // Si existe un contexto de shell, regresamos a el.
+    if (shellSavedStackPointer != 0) {
+        currentProcess = NULL;
+        return shellSavedStackPointer;
+    }
+
+    // Error de estado: no existe ningun contexto ejecutable.
+    // No debemos reanudar un proceso bloqueado o terminado.
+    __asm__ volatile ("cli");
+    for (;;) {
+        __asm__ volatile ("hlt");
+    }
 }

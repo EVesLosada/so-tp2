@@ -61,6 +61,14 @@ uint8_t unregisterProcess(uint64_t pid) {
     return 0;
 }
 
+Process *getProcessAt(uint64_t index) {
+    if (index >= MAX_PROCESSES) {
+        return NULL;
+    }
+
+    return processTable[index];
+}
+
 uint64_t getProcessCount(void) {
     return processCount;
 }
