@@ -34,6 +34,8 @@ typedef struct {
     uint64_t rip;
     uint64_t cs;
     uint64_t rflags;
+    uint64_t iretRsp;
+    uint64_t iretSs;
 } RegisterFrame;
 
 /*

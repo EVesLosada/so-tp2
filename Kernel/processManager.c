@@ -203,8 +203,7 @@ static uint64_t createProcessInternal(
         (top & ~(uintptr_t)(STACK_ALIGNMENT - 1)) -
         sizeof(uint64_t);
 
-    uintptr_t savedFrame =
-        entryRsp - sizeof(RegisterFrame);
+    uintptr_t savedFrame = entryRsp - sizeof(RegisterFrame);
 
     /*
      * Conservar espacio suficiente para la ejecucion.
@@ -225,6 +224,8 @@ static uint64_t createProcessInternal(
     frame->rip = (uint64_t)(uintptr_t)processBootstrap;
     frame->cs = KERNEL_CODE_SELECTOR;
     frame->rflags = INITIAL_RFLAGS;
+    frame->iretRsp = entryRsp;
+    frame->iretSs = 0x00;
     frame->rdi = (uint64_t)(uintptr_t)process;
 
     process->savedStackPointer = (uint64_t)savedFrame;

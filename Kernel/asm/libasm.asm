@@ -15,6 +15,7 @@ EXTERN timerTick
 EXTERN syscallDispatcher
 EXTERN keyboardProcessScancode
 EXTERN exceptionDispatcher
+EXTERN schedule
 
 section .text
 	
@@ -212,16 +213,27 @@ invalidOpcodeHandler:
 timerInterruptHandler:
     saveState
 
-    ; Preservamos el frame y alineamos stack antes de llamar C.
+    ; Guardamos el RSP del contexto interrumpido.
     mov r12, rsp
-    and rsp, -16
-    call timerTick
-    mov rsp, r12
 
-    ; EOI al PIC master para IRQ0.
+    ; Alineamos el stack para llamar a funciones C.
+    and rsp, -16
+
+    ; Actualizamos los ticks y el sonido.
+    call timerTick
+
+    ; schedule(savedRsp) recibe el contexto interrumpido.
+    mov rdi, r12
+    call schedule
+
+    ; RAX contiene el RSP del contexto seleccionado.
+    mov rsp, rax
+
+    ; Confirmamos la interrupcion al PIC master.
     mov al, 0x20
     out 0x20, al
 
+    ; Restauramos el contexto seleccionado.
     restoreState
     iretq
 
