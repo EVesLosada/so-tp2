@@ -57,6 +57,41 @@ Process *selectNextReadyProcess(void);
  */
 Process *getCurrentProcess(void);
 
+/*
+ * Bloquea un proceso READY.
+ *
+ * Si el proceso esta actualmente en RUNNING,
+ * lo bloquea y cede la CPU mediante int 0x81.
+ *
+ * Retorna 1 si tuvo exito y 0 si no.
+ */
+uint8_t blockProcess(uint64_t pid);
+
+/*
+ * Desbloquea un proceso y lo deja listo para ejecutar.
+ *
+ * Retorna 1 si tuvo exito y 0 si no.
+ */
+uint8_t unblockProcess(uint64_t pid);
+
+/*
+ * Marca como terminado un proceso READY o BLOCKED.
+ *
+ * No permite terminar directamente un proceso RUNNING.
+ * La liberacion de sus recursos se realizara despues.
+ *
+ * Retorna 1 si tuvo exito y 0 si no.
+ */
+uint8_t terminateProcess(uint64_t pid);
+
+/*
+ * Libera los recursos de los procesos terminados
+ * que ya no estan ejecutandose.
+ *
+ * Retorna la cantidad de procesos eliminados.
+ */
+uint64_t reapTerminatedProcesses(void);
+
 /**
  * @brief Selecciona el contexto que debe ejecutarse a continuación.
  *

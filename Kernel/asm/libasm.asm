@@ -10,6 +10,7 @@ GLOBAL enableTimerIRQ
 GLOBAL outb
 GLOBAL inb
 GLOBAL readTSC
+GLOBAL yieldInterruptHandler
 
 EXTERN timerTick
 EXTERN syscallDispatcher
@@ -109,6 +110,33 @@ int80Handler:
 
     ; Offset 0: rsp sintetico. Offset 8: rax guardado.
     mov [rsp + 8], rax
+
+    restoreState
+    iretq
+
+; ---------------------------------------------------------------------------
+; INT 0x81: cambio de contexto voluntario.
+;
+; Permite que un proceso ceda la CPU inmediatamente.
+; No incrementa ticks ni envia EOI al PIC porque
+; no corresponde a una interrupcion de hardware.
+; ---------------------------------------------------------------------------
+
+yieldInterruptHandler:
+    saveState
+
+    ; Guardar el contexto actual.
+    mov r12, rsp
+
+    ; Alinear el stack antes de llamar a C.
+    and rsp, -16
+
+    ; Elegir el siguiente contexto.
+    mov rdi, r12
+    call schedule
+
+    ; Restaurar el contexto seleccionado.
+    mov rsp, rax
 
     restoreState
     iretq

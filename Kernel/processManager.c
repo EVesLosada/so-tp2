@@ -21,6 +21,48 @@ static Process *currentProcess = NULL;
 static uint64_t shellSavedStackPointer = 0;
 
 /*
+ * Guarda el estado de las interrupciones y las desactiva.
+ *
+ * En los tests de Linux no ejecutamos CLI porque es
+ * una instruccion privilegiada.
+ */
+static uint64_t saveAndDisableInterrupts(void) {
+#if __STDC_HOSTED__
+    return 0;
+#else
+    uint64_t flags;
+
+    __asm__ volatile (
+        "pushfq\n\t"
+        "popq %0\n\t"
+        "cli"
+        : "=r"(flags)
+        :
+        : "memory", "cc"
+    );
+
+    return flags;
+#endif
+}
+
+/*
+ * Restaura el estado previo de las interrupciones.
+ */
+static void restoreInterrupts(uint64_t flags) {
+#if __STDC_HOSTED__
+    (void)flags;
+#else
+    __asm__ volatile (
+        "pushq %0\n\t"
+        "popfq"
+        :
+        : "r"(flags)
+        : "memory", "cc"
+    );
+#endif
+}
+
+/*
  * Punto de entrada inicial de todos los procesos.
  */
 static void processBootstrap(Process *process) {
@@ -307,6 +349,149 @@ Process *selectNextReadyProcess(void) {
 
 Process *getCurrentProcess(void) {
     return currentProcess;
+}
+
+uint8_t blockProcess(uint64_t pid) {
+    uint64_t flags = saveAndDisableInterrupts();
+
+    Process *process = findProcessByPid(pid);
+
+    if (process == NULL) {
+        restoreInterrupts(flags);
+        return 0;
+    }
+
+    /*
+     * Caso 1: bloquear el proceso actualmente
+     * en ejecucion.
+     */
+    if (process == currentProcess &&
+        process->state == PROCESS_RUNNING) {
+
+        process->state = PROCESS_BLOCKED;
+
+        /*
+         * En el kernel, INT 0x81 guarda el contexto
+         * y ejecuta el scheduler inmediatamente.
+         *
+         * En los tests de Linux no ejecutamos
+         * interrupciones del kernel: el cambio de
+         * contexto se simula por separado.
+         */
+#if !__STDC_HOSTED__
+        __asm__ volatile ("int $0x81" ::: "memory");
+#endif
+
+        /*
+         * Si otro proceso nos desbloquea y el
+         * scheduler nos reanuda, continuamos aca.
+         */
+        restoreInterrupts(flags);
+        return 1;
+    }
+
+    /*
+     * Caso 2: bloquear otro proceso que esta READY.
+     */
+    if (process->state == PROCESS_READY) {
+        process->state = PROCESS_BLOCKED;
+
+        restoreInterrupts(flags);
+        return 1;
+    }
+
+    /*
+     * No permitimos bloquear procesos que ya estan
+     * bloqueados, terminados o ejecutandose en otro
+     * contexto.
+     */
+    restoreInterrupts(flags);
+    return 0;
+}
+
+uint8_t unblockProcess(uint64_t pid) {
+    uint64_t flags = saveAndDisableInterrupts();
+
+    Process *process = findProcessByPid(pid);
+    uint8_t result = 0;
+
+    if (process != NULL &&
+        process->state == PROCESS_BLOCKED) {
+
+        process->state = PROCESS_READY;
+        result = 1;
+    }
+
+    restoreInterrupts(flags);
+    return result;
+}
+
+uint8_t terminateProcess(uint64_t pid) {
+    uint64_t flags = saveAndDisableInterrupts();
+
+    Process *process = findProcessByPid(pid);
+    uint8_t result = 0;
+
+    if (process != NULL &&
+        process != currentProcess &&
+        process->state != PROCESS_RUNNING &&
+        process->state != PROCESS_TERMINATED) {
+
+        process->state = PROCESS_TERMINATED;
+        result = 1;
+    }
+
+    restoreInterrupts(flags);
+    return result;
+}
+
+uint64_t reapTerminatedProcesses(void) {
+    uint64_t flags = saveAndDisableInterrupts();
+    uint64_t reaped = 0;
+
+    for (uint64_t i = 0; i < MAX_PROCESSES; i++) {
+        Process *process = getProcessAt(i);
+
+        if (process == NULL) {
+            continue;
+        }
+
+        /*
+         * Nunca liberar el proceso que todavia
+         * esta usando la CPU.
+         */
+        if (process == currentProcess) {
+            continue;
+        }
+
+        if (process->state != PROCESS_TERMINATED) {
+            continue;
+        }
+
+        uint64_t pid = process->pid;
+        void *stack = process->stackBase;
+
+        /*
+         * Primero quitar el proceso de la tabla,
+         * para que nadie pueda volver a encontrarlo.
+         */
+        if (!unregisterProcess(pid)) {
+            continue;
+        }
+
+        /*
+         * Ya no esta registrado ni ejecutandose:
+         * podemos liberar su stack y su PCB.
+         */
+        freeMemory(stack);
+        freeMemory(process);
+
+        reaped++;
+    }
+
+    restoreInterrupts(flags);
+
+    return reaped;
 }
 
 uint64_t schedule(uint64_t savedRsp) {

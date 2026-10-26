@@ -6,6 +6,7 @@
 #define TIMER_VECTOR          0x20
 #define KEYBOARD_VECTOR        0x21
 #define SYSCALL_VECTOR         0x80
+#define YIELD_VECTOR           0x81
 
 #define IDT_BASE_ADDRESS       0x0000000000000000
 #define KERNEL_CODE_SELECTOR   0x08
@@ -32,6 +33,7 @@ extern void enableInterrupts(void);
 extern void divZeroHandler(void);
 extern void invalidOpcodeHandler(void);
 extern void timerInterruptHandler(void);
+extern void yieldInterruptHandler(void);
 extern void enableTimerIRQ(void);
 
 /*
@@ -74,6 +76,12 @@ void initializeInterrupts(void) {
      * Se usa un gate accesible desde ring 3.
      */
     setIDTEntry(SYSCALL_VECTOR, int80Handler, USER_INTERRUPT_GATE);
+
+    /*
+    * Interrupcion de software para ceder la CPU.
+    * Solo accesible directamente desde codigo del kernel.
+    */
+    setIDTEntry(YIELD_VECTOR, yieldInterruptHandler, KERNEL_INTERRUPT_GATE);
 
     /*
      * Habilitamos IRQ0 en el PIC para que el timer pueda

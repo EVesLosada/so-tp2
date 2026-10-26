@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stddef.h>
 #include <syscalls.h>
 #include <terminal.h>
 #include <keyboard.h>
@@ -8,6 +9,7 @@
 #include <rtc.h>
 #include <cracker.h>
 #include <memoryManager.h>
+#include <processManager.h>
 
 #define STDIN  0
 #define STDOUT 1
@@ -208,6 +210,21 @@ static uint64_t sysCrack(char *resultBuffer,
 }
 
 uint64_t syscallDispatcher(RegisterFrame *frame) {
+
+    /*
+     * La shell todavia no tiene PCB.
+     *
+     * Cuando atiende una syscall, aprovechamos para
+     * recuperar los recursos de procesos terminados.
+     *
+     * No hacemos esta limpieza desde el timer:
+     * liberar memoria durante una interrupcion de
+     * planificacion podria ser peligroso.
+     */
+    if (getCurrentProcess() == NULL) {
+        reapTerminatedProcesses();
+    }
+
     switch (frame->rax) {
         case SYS_WRITE:
             return sysWrite(
