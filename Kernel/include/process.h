@@ -57,6 +57,12 @@ typedef struct Process {
     uint64_t parentPid;
 
     /*
+     * PID del hijo cuya terminacion espera este proceso.
+     * 0 indica que no esta esperando a ningun hijo.
+     */
+    uint64_t waitingForChildPid;
+
+    /*
      * Indica si el proceso ocupa el foreground.
      */
     uint8_t foreground;

@@ -92,6 +92,18 @@ uint8_t terminateProcess(uint64_t pid);
  */
 uint64_t reapTerminatedProcesses(void);
 
+/*
+ * Espera la finalizacion de un hijo directo.
+ *
+ * Si el hijo sigue ejecutandose, bloquea al padre.
+ * Si ya termino, recoge su finalizacion y libera
+ * los recursos del hijo.
+ *
+ * Retorna el PID del hijo si tuvo exito.
+ * Retorna 0 si el PID es invalido o no es su hijo.
+ */
+uint64_t waitForChild(uint64_t childPid);
+
 /**
  * @brief Selecciona el contexto que debe ejecutarse a continuación.
  *

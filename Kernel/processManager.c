@@ -65,6 +65,24 @@ static void restoreInterrupts(uint64_t flags) {
 /*
  * Punto de entrada inicial de todos los procesos.
  */
+/*
+ * Despierta al padre si esta esperando a este hijo.
+ * Se llama con las interrupciones deshabilitadas.
+ */
+static void wakeParentWaitingForChild(Process *child) {
+    if (child->parentPid == 0) {
+        return;
+    }
+
+    Process *parent = findProcessByPid(child->parentPid);
+
+    if (parent != NULL &&
+        parent->state == PROCESS_BLOCKED &&
+        parent->waitingForChildPid == child->pid) {
+        parent->state = PROCESS_READY;
+    }
+}
+
 static void processBootstrap(Process *process) {
     if (process->entryPointWithArgs != NULL) {
         process->entryPointWithArgs(process->argc, process->argv);
@@ -73,9 +91,21 @@ static void processBootstrap(Process *process) {
     }
 
     /*
-     * La finalizacion completa corresponde al Bloque 10.
+     * Finalizar el proceso y notificar a su padre.
      */
+    uint64_t flags = saveAndDisableInterrupts();
+
     process->state = PROCESS_TERMINATED;
+    wakeParentWaitingForChild(process);
+
+    restoreInterrupts(flags);
+
+    /*
+     * Ceder la CPU sin volver a ejecutar este proceso.
+     */
+#if !__STDC_HOSTED__
+    __asm__ volatile ("int $0x81" ::: "memory");
+#endif
 
     for (;;) {
         __asm__ volatile ("hlt");
@@ -438,6 +468,7 @@ uint8_t terminateProcess(uint64_t pid) {
         process->state != PROCESS_TERMINATED) {
 
         process->state = PROCESS_TERMINATED;
+        wakeParentWaitingForChild(process);
         result = 1;
     }
 
@@ -468,6 +499,22 @@ uint64_t reapTerminatedProcesses(void) {
             continue;
         }
 
+        /*
+         * Conservar los hijos terminados de padres vivos
+         * hasta que el padre recoja su finalizacion.
+         *
+         * Los procesos sin padre, huerfanos o cuyos
+         * padres terminaron pueden liberarse.
+         */
+        if (process->parentPid != 0) {
+            Process *parent = findProcessByPid(process->parentPid);
+
+            if (parent != NULL &&
+                parent->state != PROCESS_TERMINATED) {
+                continue;
+            }
+        }
+
         uint64_t pid = process->pid;
         void *stack = process->stackBase;
 
@@ -492,6 +539,65 @@ uint64_t reapTerminatedProcesses(void) {
     restoreInterrupts(flags);
 
     return reaped;
+}
+
+/*
+ * Espera la finalizacion de un hijo directo.
+ */
+uint64_t waitForChild(uint64_t childPid) {
+    uint64_t flags = saveAndDisableInterrupts();
+
+    Process *parent = currentProcess;
+
+    if (parent == NULL || childPid == 0) {
+        restoreInterrupts(flags);
+        return 0;
+    }
+
+    Process *child = findProcessByPid(childPid);
+
+    if (child == NULL || child->parentPid != parent->pid) {
+        restoreInterrupts(flags);
+        return 0;
+    }
+
+    /*
+     * Mientras el hijo no termine, bloquear al padre
+     * y ceder la CPU.
+     */
+    while (child->state != PROCESS_TERMINATED) {
+        parent->waitingForChildPid = childPid;
+        parent->state = PROCESS_BLOCKED;
+
+#if __STDC_HOSTED__
+        /*
+         * Los tests de Linux no pueden ejecutar INT 0x81.
+         * Devuelve 0 para permitir simular la espera.
+         */
+        restoreInterrupts(flags);
+        return 0;
+#else
+        __asm__ volatile ("int $0x81" ::: "memory");
+#endif
+    }
+
+    /*
+     * El hijo termino y el padre ya puede recogerlo.
+     */
+    parent->waitingForChildPid = 0;
+
+    if (!unregisterProcess(childPid)) {
+        restoreInterrupts(flags);
+        return 0;
+    }
+
+    void *stack = child->stackBase;
+
+    freeMemory(stack);
+    freeMemory(child);
+
+    restoreInterrupts(flags);
+    return childPid;
 }
 
 uint64_t schedule(uint64_t savedRsp) {

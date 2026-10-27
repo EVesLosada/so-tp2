@@ -420,6 +420,149 @@ int main(void) {
 
     puts("OK: autobloqueo y reanudacion simulados");
 
+
+    /*
+     * Bloque 10: esperar un hijo que ya termino.
+     */
+    assert(waitForChild(0) == 0);
+
+    uint64_t parentDonePid = createProcess(
+        "padre_zombie", dummyEntry, 1, 0, 0
+    );
+    uint64_t childDonePid = createProcess(
+        "hijo_zombie", dummyEntry, 1, parentDonePid, 0
+    );
+
+    assert(parentDonePid != 0 && childDonePid != 0);
+    assert(terminateProcess(childDonePid) == 1);
+
+    /* El reaper debe conservar al hijo mientras viva su padre. */
+    assert(reapTerminatedProcesses() == 0);
+    assert(findProcessByPid(childDonePid) != NULL);
+    assert(activeAllocations == 4);
+
+    uint64_t shellWaitRsp1 = 0x33330000ULL;
+    uint64_t parentDoneRsp = schedule(shellWaitRsp1);
+    Process *parentDone = getCurrentProcess();
+
+    assert(parentDone != NULL);
+    assert(parentDone->pid == parentDonePid);
+
+    /* Wait recoge al hijo y libera sus dos reservas. */
+    assert(waitForChild(childDonePid) == childDonePid);
+    assert(findProcessByPid(childDonePid) == NULL);
+    assert(parentDone->waitingForChildPid == 0);
+    assert(getProcessCount() == 1);
+    assert(activeAllocations == 2);
+
+    /* No se puede esperar dos veces al mismo hijo. */
+    assert(waitForChild(childDonePid) == 0);
+    assert(waitForChild(parentDonePid) == 0);
+
+    parentDone->state = PROCESS_TERMINATED;
+    assert(schedule(parentDoneRsp) == shellWaitRsp1);
+    assert(getCurrentProcess() == NULL);
+    assert(reapTerminatedProcesses() == 1);
+    assert(getProcessCount() == 0);
+    assert(activeAllocations == 0);
+
+    puts("OK: wait recoge hijos terminados y libera memoria");
+
+    /*
+     * Bloque 10: esperar un hijo que sigue ejecutandose.
+     * En Linux simulamos el cambio de contexto.
+     */
+    uint64_t parentWaitPid = createProcess(
+        "padre_wait", dummyEntry, 1, 0, 0
+    );
+    assert(parentWaitPid != 0);
+
+    uint64_t shellWaitRsp2 = 0x44440000ULL;
+    uint64_t parentWaitRsp = schedule(shellWaitRsp2);
+    Process *parentWait = getCurrentProcess();
+
+    assert(parentWait != NULL);
+    assert(parentWait->pid == parentWaitPid);
+    assert(parentWait->state == PROCESS_RUNNING);
+
+    uint64_t childWaitPid = createProcess(
+        "hijo_wait", dummyEntry, 1, parentWaitPid, 0
+    );
+    assert(childWaitPid != 0);
+
+    /* Rechazar procesos que no son hijos propios. */
+    uint64_t foreignPid = createProcess(
+        "proceso_ajeno", dummyEntry, 1, 0, 0
+    );
+
+    assert(foreignPid != 0);
+    assert(waitForChild(foreignPid) == 0);
+    assert(terminateProcess(foreignPid) == 1);
+    assert(reapTerminatedProcesses() == 1);
+    assert(waitForChild(parentWaitPid) == 0);
+    assert(waitForChild(UINT64_MAX) == 0);
+    assert(parentWait->state == PROCESS_RUNNING);
+
+    /* Wait registra la espera y bloquea al padre. */
+    assert(waitForChild(childWaitPid) == 0);
+    assert(parentWait->state == PROCESS_BLOCKED);
+    assert(parentWait->waitingForChildPid == childWaitPid);
+
+    /* El scheduler debe seleccionar al hijo, no al padre. */
+    uint64_t childWaitRsp = schedule(parentWaitRsp);
+    Process *childWait = getCurrentProcess();
+
+    assert(childWait != NULL);
+    assert(childWait->pid == childWaitPid);
+    assert(childWait->state == PROCESS_RUNNING);
+
+    /* Simular que el hijo cede CPU y luego es terminado. */
+    assert(schedule(childWaitRsp) == shellWaitRsp2);
+    assert(getCurrentProcess() == NULL);
+    assert(terminateProcess(childWaitPid) == 1);
+
+    /* La terminacion debe despertar al padre. */
+    assert(parentWait->state == PROCESS_READY);
+    assert(reapTerminatedProcesses() == 0);
+
+    /* El padre reanudado recoge a su hijo. */
+    assert(schedule(shellWaitRsp2) == parentWaitRsp);
+    assert(getCurrentProcess() == parentWait);
+    assert(waitForChild(childWaitPid) == childWaitPid);
+    assert(parentWait->waitingForChildPid == 0);
+    assert(findProcessByPid(childWaitPid) == NULL);
+    assert(activeAllocations == 2);
+
+    parentWait->state = PROCESS_TERMINATED;
+    assert(schedule(parentWaitRsp) == shellWaitRsp2);
+    assert(reapTerminatedProcesses() == 1);
+    assert(getProcessCount() == 0);
+    assert(activeAllocations == 0);
+
+    puts("OK: wait bloquea al padre y la terminacion lo despierta");
+
+    /*
+     * Bloque 10: limpiar hijos cuando su padre termina
+     * sin haberlos esperado.
+     */
+    uint64_t orphanParentPid = createProcess(
+        "padre_huerfano", dummyEntry, 1, 0, 0
+    );
+    uint64_t orphanChildPid = createProcess(
+        "hijo_huerfano", dummyEntry, 1, orphanParentPid, 0
+    );
+
+    assert(orphanParentPid != 0 && orphanChildPid != 0);
+    assert(terminateProcess(orphanChildPid) == 1);
+    assert(reapTerminatedProcesses() == 0);
+
+    assert(terminateProcess(orphanParentPid) == 1);
+    assert(reapTerminatedProcesses() == 2);
+    assert(getProcessCount() == 0);
+    assert(activeAllocations == 0);
+
+    puts("OK: hijos huerfanos terminados se liberan correctamente");
+
     puts("OK: pruebas del administrador de procesos superadas");
     return 0;
 }
