@@ -563,6 +563,47 @@ int main(void) {
 
     puts("OK: hijos huerfanos terminados se liberan correctamente");
 
+    /*
+     * Bloque 11: modificacion de prioridades.
+     */
+    assert(getProcessCount() == 0);
+    assert(setProcessPriority(0, 3) == 0);
+    assert(setProcessPriority(UINT64_MAX, 3) == 0);
+
+    uint64_t priorityPid = createProcess(
+        "prioridad", dummyEntry, 2, 0, 1
+    );
+    assert(priorityPid != 0);
+
+    Process *priorityProcess = findProcessByPid(priorityPid);
+    assert(priorityProcess != NULL);
+    assert(priorityProcess->priority == 2);
+    assert(priorityProcess->state == PROCESS_READY);
+
+    /* Cambiar prioridad sin modificar el resto del PCB. */
+    assert(setProcessPriority(priorityPid, 5) == 1);
+    assert(priorityProcess->priority == 5);
+    assert(priorityProcess->pid == priorityPid);
+    assert(priorityProcess->state == PROCESS_READY);
+
+    /* Un proceso bloqueado tambien puede cambiar prioridad. */
+    assert(blockProcess(priorityPid) == 1);
+    assert(priorityProcess->state == PROCESS_BLOCKED);
+    assert(setProcessPriority(priorityPid, 1) == 1);
+    assert(priorityProcess->priority == 1);
+    assert(priorityProcess->state == PROCESS_BLOCKED);
+
+    /* Un proceso terminado no puede cambiar prioridad. */
+    assert(terminateProcess(priorityPid) == 1);
+    assert(setProcessPriority(priorityPid, 3) == 0);
+    assert(reapTerminatedProcesses() == 1);
+    assert(setProcessPriority(priorityPid, 3) == 0);
+
+    assert(getProcessCount() == 0);
+    assert(activeAllocations == 0);
+
+    puts("OK: cambios de prioridad superados");
+
     puts("OK: pruebas del administrador de procesos superadas");
     return 0;
 }

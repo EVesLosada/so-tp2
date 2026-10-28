@@ -381,6 +381,23 @@ Process *getCurrentProcess(void) {
     return currentProcess;
 }
 
+uint8_t setProcessPriority(uint64_t pid, uint64_t priority) {
+    uint64_t flags = saveAndDisableInterrupts();
+
+    Process *process = findProcessByPid(pid);
+
+    if (process == NULL ||
+        process->state == PROCESS_TERMINATED) {
+        restoreInterrupts(flags);
+        return 0;
+    }
+
+    process->priority = priority;
+
+    restoreInterrupts(flags);
+    return 1;
+}
+
 uint8_t blockProcess(uint64_t pid) {
     uint64_t flags = saveAndDisableInterrupts();
 

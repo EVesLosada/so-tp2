@@ -57,4 +57,19 @@ uint64_t sysCrack(char *resultBuffer,
 void *sysMalloc(uint64_t size);
 void sysFree(void *ptr);
 uint64_t sysMemInfo(MemoryInfo *info);
+
+/*
+ * Modifica la prioridad de un proceso.
+ * Retorna 1 si tuvo exito, 0 si fallo.
+ */
+uint64_t sysNice(uint64_t pid, uint64_t priority);
+
+/* Bloquea un proceso por PID. Retorna 1 si tuvo exito. */
+uint64_t sysBlock(uint64_t pid);
+
+/* Desbloquea un proceso por PID. Retorna 1 si tuvo exito. */
+uint64_t sysUnblock(uint64_t pid);
+
+/* Cede voluntariamente la CPU. Retorna 1 al reanudarse. */
+uint64_t sysYield(void);
 #endif

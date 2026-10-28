@@ -16,8 +16,40 @@ GLOBAL sysCrack
 GLOBAL sysMalloc
 GLOBAL sysFree
 GLOBAL sysMemInfo
+GLOBAL sysNice
+GLOBAL sysBlock
+GLOBAL sysUnblock
+GLOBAL sysYield
 
 section .text
+
+; uint64_t sysNice(uint64_t pid, uint64_t priority)
+; RDI = PID
+; RSI = nueva prioridad
+; uint64_t sysBlock(uint64_t pid)
+sysBlock:
+    mov rax, SYS_BLOCK
+    int 0x80
+    ret
+
+; uint64_t sysUnblock(uint64_t pid)
+; uint64_t sysYield(void)
+sysYield:
+    mov rax, SYS_YIELD
+    int 0x80
+    ret
+
+sysUnblock:
+    mov rax, SYS_UNBLOCK
+    int 0x80
+    ret
+
+sysNice:
+    mov rax, SYS_NICE
+    int 0x80
+    ret
+
+
 
 ; uint64_t sysWrite(uint64_t fd, const char *buffer, uint64_t count)
 sysWrite:

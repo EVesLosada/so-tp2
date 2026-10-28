@@ -322,6 +322,42 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
             getMemoryInfo((MemoryInfo *)(uintptr_t)frame->rdi);
             return 1;
 
+        /*
+         * Modificar la prioridad de un proceso.
+         *
+         * RDI = PID
+         * RSI = nueva prioridad
+         * RAX = 1 si tuvo exito, 0 si fallo
+         */
+        case SYS_NICE:
+            return setProcessPriority(frame->rdi, frame->rsi);
+
+        /*
+         * Bloquear un proceso por PID.
+         * RDI = PID
+         * RAX = 1 si tuvo exito, 0 si fallo
+         */
+        case SYS_BLOCK:
+            return blockProcess(frame->rdi);
+
+        /*
+         * Desbloquear un proceso por PID.
+         * RDI = PID
+         * RAX = 1 si tuvo exito, 0 si fallo
+         */
+        case SYS_UNBLOCK:
+            return unblockProcess(frame->rdi);
+
+        /*
+         * Ceder voluntariamente la CPU.
+         * INT 0x81 guarda el contexto y ejecuta el scheduler.
+         */
+        case SYS_YIELD:
+#if !__STDC_HOSTED__
+            __asm__ volatile ("int $0x81" ::: "memory");
+#endif
+            return 1;
+
         default:
             return 0;
     }

@@ -58,6 +58,14 @@ Process *selectNextReadyProcess(void);
 Process *getCurrentProcess(void);
 
 /*
+ * Modifica la prioridad de un proceso existente.
+ *
+ * Retorna 1 si tuvo exito y 0 si el PID es invalido
+ * o el proceso ya termino.
+ */
+uint8_t setProcessPriority(uint64_t pid, uint64_t priority);
+
+/*
  * Bloquea un proceso READY.
  *
  * Si el proceso esta actualmente en RUNNING,
