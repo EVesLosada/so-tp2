@@ -10,6 +10,7 @@
 #include <memoryRegion.h>
 #include <memoryManager.h>
 #include <processManager.h>
+#include <semaphore.h>
 
 extern uint8_t text;
 extern uint8_t rodata;
@@ -138,6 +139,7 @@ int main()
 		* Todavia no se crean ni ejecutan procesos nuevos.
 		*/
 		initializeProcessManager();
+		initializeSemaphoreTable();
 
         //Registramos int 80h para que Userland pueda solicitar servicios.
         initializeInterrupts();

@@ -73,5 +73,12 @@ run_test test_scheduler \
   Kernel/processManager.c \
   Kernel/memoryManager.c
 
+run_test test_atomic_ops \
+    tests/test_atomic_ops.c
+
+run_test test_semaphore \
+    tests/test_semaphore.c \
+    Kernel/semaphore.c
+
 echo
 echo "OK: todos los tests auxiliares superados"
