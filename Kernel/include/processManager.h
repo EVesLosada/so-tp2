@@ -58,6 +58,12 @@ Process *selectNextReadyProcess(void);
 Process *getCurrentProcess(void);
 
 /*
+ * Copia hasta capacity procesos registrados en destination.
+ * Retorna la cantidad de entradas copiadas.
+ */
+uint64_t getProcessSnapshot(ProcessInfo *destination, uint64_t capacity);
+
+/*
  * Modifica la prioridad de un proceso existente.
  *
  * Retorna 1 si tuvo exito y 0 si el PID es invalido
@@ -91,6 +97,16 @@ uint8_t unblockProcess(uint64_t pid);
  * Retorna 1 si tuvo exito y 0 si no.
  */
 uint8_t terminateProcess(uint64_t pid);
+
+/*
+ * Finaliza el proceso actualmente en ejecucion.
+ *
+ * En el Kernel real no retorna si tuvo exito:
+ * marca al proceso como terminado y cede la CPU.
+ *
+ * Retorna 0 si no hay un proceso RUNNING.
+ */
+uint8_t exitCurrentProcess(void);
 
 /*
  * Libera los recursos de los procesos terminados

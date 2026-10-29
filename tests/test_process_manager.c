@@ -69,6 +69,69 @@ static void checkProcessContext(Process *process) {
     assert((frame->rsp & 15) == 8);
 }
 
+
+/*
+ * Verifica la copia de informacion publica de los procesos.
+ */
+static void testProcessSnapshot(void) {
+    initializeProcessManager();
+
+    ProcessInfo snapshot[2] = {0};
+
+    assert(getProcessSnapshot(snapshot, 2) == 0);
+    assert(getProcessSnapshot(NULL, 2) == 0);
+    assert(getProcessSnapshot(snapshot, 0) == 0);
+
+    Process first = {
+        .pid = 101,
+        .name = "procesoA",
+        .state = PROCESS_READY,
+        .priority = 3,
+        .foreground = 1,
+        .savedStackPointer = 0x1000
+    };
+
+    Process second = {
+        .pid = 102,
+        .name = "procesoB",
+        .state = PROCESS_BLOCKED,
+        .priority = 5,
+        .foreground = 0,
+        .savedStackPointer = 0x2000
+    };
+
+    assert(registerProcess(&first) == 1);
+    assert(registerProcess(&second) == 1);
+
+    /* Un buffer de capacidad 1 no debe modificar la segunda entrada. */
+    snapshot[1].pid = 999;
+    assert(getProcessSnapshot(snapshot, 1) == 1);
+    assert(snapshot[0].pid == 101);
+    assert(snapshot[1].pid == 999);
+
+    /* Con capacidad 2 debe devolver ambos procesos. */
+    assert(getProcessSnapshot(snapshot, 2) == 2);
+
+    assert(snapshot[0].pid == 101);
+    assert(snapshot[0].name[0] == 'p');
+    assert(snapshot[0].state == PROCESS_READY);
+    assert(snapshot[0].priority == 3);
+    assert(snapshot[0].foreground == 1);
+    assert(snapshot[0].stackPointer == 0x1000);
+    assert(snapshot[0].basePointer == 0);
+
+    assert(snapshot[1].pid == 102);
+    assert(snapshot[1].state == PROCESS_BLOCKED);
+    assert(snapshot[1].priority == 5);
+    assert(snapshot[1].foreground == 0);
+    assert(snapshot[1].stackPointer == 0x2000);
+
+    assert(unregisterProcess(101) == 1);
+    assert(unregisterProcess(102) == 1);
+
+    printf("OK: snapshot de procesos superado\n");
+}
+
 int main(void) {
     initializeProcessManager();
 
@@ -605,5 +668,6 @@ int main(void) {
     puts("OK: cambios de prioridad superados");
 
     puts("OK: pruebas del administrador de procesos superadas");
+    testProcessSnapshot();
     return 0;
 }

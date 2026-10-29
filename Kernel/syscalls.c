@@ -323,6 +323,102 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
             return 1;
 
         /*
+         * Crear un proceso con argumentos.
+         *
+         * RDI = nombre
+         * RSI = punto de entrada
+         * RDX = prioridad
+         * RCX = foreground (0 o 1)
+         * R8  = argc
+         * R9  = argv
+         *
+         * El PID del padre lo determina el Kernel.
+         * RAX = PID creado o 0 si falla.
+         */
+        case SYS_CREATE_PROC: {
+            if (frame->rcx > 1) {
+                return 0;
+            }
+
+            Process *parent = getCurrentProcess();
+            uint64_t parentPid = parent != NULL ? parent->pid : 0;
+
+            return createProcessWithArgs(
+                (const char *)(uintptr_t)frame->rdi,
+                (void (*)(uint64_t, char **))(uintptr_t)frame->rsi,
+                frame->rdx,
+                parentPid,
+                (uint8_t)frame->rcx,
+                frame->r8,
+                (const char *const *)(uintptr_t)frame->r9
+            );
+        }
+
+        /*
+         * Obtener el PID del proceso actual.
+         * La shell todavia no tiene PCB y devuelve 0.
+         */
+        case SYS_GET_PID: {
+            Process *current = getCurrentProcess();
+            return current != NULL ? current->pid : 0;
+        }
+
+        /*
+         * Finalizar el proceso actual.
+         * Si tiene exito, no retorna a Userland.
+         */
+        case SYS_EXIT:
+            return exitCurrentProcess();
+
+        /*
+         * Terminar un proceso por PID.
+         *
+         * RDI = PID del proceso a terminar.
+         * RAX = 1 si tuvo exito, 0 si fallo.
+         *
+         * Si el proceso se mata a si mismo,
+         * debe ceder la CPU y no volver a ejecutarse.
+         */
+        case SYS_KILL: {
+            uint64_t pid = frame->rdi;
+            Process *current = getCurrentProcess();
+
+            if (pid == 0) {
+                return 0;
+            }
+
+            if (current != NULL && current->pid == pid) {
+                return exitCurrentProcess();
+            }
+
+            return terminateProcess(pid);
+        }
+
+        /*
+         * Esperar la finalizacion de un hijo directo.
+         *
+         * RDI = PID del hijo.
+         * RAX = PID del hijo si tuvo exito, 0 si fallo.
+         *
+         * Si el hijo sigue ejecutandose, waitForChild()
+         * bloquea al padre y cede la CPU al scheduler.
+         */
+        case SYS_WAIT:
+            return waitForChild(frame->rdi);
+
+        /*
+         * Copiar la tabla de procesos a Userland.
+         * RDI = buffer de ProcessInfo
+         * RSI = capacidad del buffer
+         * RAX = cantidad de procesos copiados
+         */
+        case SYS_PS:
+            return getProcessSnapshot(
+                (ProcessInfo *)(uintptr_t)frame->rdi,
+                frame->rsi
+            );
+
+        /*
          * Modificar la prioridad de un proceso.
          *
          * RDI = PID

@@ -16,6 +16,12 @@ GLOBAL sysCrack
 GLOBAL sysMalloc
 GLOBAL sysFree
 GLOBAL sysMemInfo
+GLOBAL sysCreateProcess
+GLOBAL sysExit
+GLOBAL sysKill
+GLOBAL sysWait
+GLOBAL sysGetPid
+GLOBAL sysPs
 GLOBAL sysNice
 GLOBAL sysBlock
 GLOBAL sysUnblock
@@ -41,6 +47,47 @@ sysYield:
 
 sysUnblock:
     mov rax, SYS_UNBLOCK
+    int 0x80
+    ret
+
+; uint64_t sysExit(void)
+; Finaliza el proceso actual. No retorna si tiene exito.
+; uint64_t sysKill(uint64_t pid)
+; RDI = PID del proceso a terminar.
+; RAX = 1 si tuvo exito, 0 si fallo.
+; uint64_t sysWait(uint64_t childPid)
+; RDI = PID del hijo que se desea esperar.
+; RAX = PID del hijo o 0 si falla.
+sysWait:
+    mov rax, SYS_WAIT
+    int 0x80
+    ret
+
+sysKill:
+    mov rax, SYS_KILL
+    int 0x80
+    ret
+
+sysExit:
+    mov rax, SYS_EXIT
+    int 0x80
+    ret
+
+; uint64_t sysCreateProcess(name, entryPoint, priority,
+;                           foreground, argc, argv)
+; Los seis argumentos llegan en RDI, RSI, RDX, RCX, R8 y R9.
+sysCreateProcess:
+    mov rax, SYS_CREATE_PROC
+    int 0x80
+    ret
+
+sysPs:
+    mov rax, SYS_PS
+    int 0x80
+    ret
+
+sysGetPid:
+    mov rax, SYS_GET_PID
     int 0x80
     ret
 

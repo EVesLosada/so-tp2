@@ -62,6 +62,45 @@ uint64_t sysMemInfo(MemoryInfo *info);
  * Modifica la prioridad de un proceso.
  * Retorna 1 si tuvo exito, 0 si fallo.
  */
+/*
+ * Crea un proceso con argumentos.
+ * Retorna el nuevo PID o 0 si falla.
+ */
+uint64_t sysCreateProcess(
+    const char *name,
+    void (*entryPoint)(uint64_t argc, char **argv),
+    uint64_t priority,
+    uint8_t foreground,
+    uint64_t argc,
+    const char *const argv[]
+);
+
+/*
+ * Finaliza el proceso actual.
+ * No retorna si tiene exito.
+ * Devuelve 0 si no existe un proceso actual.
+ */
+uint64_t sysExit(void);
+
+/*
+ * Termina el proceso identificado por pid.
+ * Retorna 1 si tuvo exito y 0 si fallo.
+ * No retorna si el proceso se mata a si mismo.
+ */
+uint64_t sysKill(uint64_t pid);
+
+/*
+ * Espera la finalizacion de un hijo directo.
+ * Retorna el PID del hijo cuando termina.
+ * Retorna 0 si el PID es invalido o no es su hijo.
+ */
+uint64_t sysWait(uint64_t childPid);
+
+uint64_t sysGetPid(void);
+
+/* Retorna la cantidad de procesos copiados al buffer. */
+uint64_t sysPs(ProcessInfo *buffer, uint64_t capacity);
+
 uint64_t sysNice(uint64_t pid, uint64_t priority);
 
 /* Bloquea un proceso por PID. Retorna 1 si tuvo exito. */

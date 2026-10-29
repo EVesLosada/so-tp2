@@ -91,21 +91,10 @@ static void processBootstrap(Process *process) {
     }
 
     /*
-     * Finalizar el proceso y notificar a su padre.
+     * Si la funcion del proceso retorna,
+     * tambien debe finalizar correctamente.
      */
-    uint64_t flags = saveAndDisableInterrupts();
-
-    process->state = PROCESS_TERMINATED;
-    wakeParentWaitingForChild(process);
-
-    restoreInterrupts(flags);
-
-    /*
-     * Ceder la CPU sin volver a ejecutar este proceso.
-     */
-#if !__STDC_HOSTED__
-    __asm__ volatile ("int $0x81" ::: "memory");
-#endif
+    exitCurrentProcess();
 
     for (;;) {
         __asm__ volatile ("hlt");
@@ -377,8 +366,92 @@ Process *selectNextReadyProcess(void) {
     return NULL;
 }
 
+uint64_t getProcessSnapshot(ProcessInfo *destination, uint64_t capacity) {
+    if (destination == NULL || capacity == 0) {
+        return 0;
+    }
+
+    uint64_t flags = saveAndDisableInterrupts();
+    uint64_t count = 0;
+
+    for (uint64_t i = 0; i < MAX_PROCESSES && count < capacity; i++) {
+        Process *process = getProcessAt(i);
+
+        if (process == NULL) {
+            continue;
+        }
+
+        ProcessInfo *info = &destination[count];
+        *info = (ProcessInfo){0};
+
+        info->pid = process->pid;
+        info->priority = process->priority;
+        info->state = process->state;
+        info->foreground = process->foreground;
+
+        /*
+         * Contexto guardado por el scheduler.
+         * El RBP exacto aun no se registra en el PCB.
+         */
+        info->stackPointer = process->savedStackPointer;
+        info->basePointer = 0;
+
+        for (uint64_t j = 0; j < PROCESS_NAME_MAX_LENGTH; j++) {
+            info->name[j] = process->name[j];
+        }
+
+        count++;
+    }
+
+    restoreInterrupts(flags);
+    return count;
+}
+
 Process *getCurrentProcess(void) {
     return currentProcess;
+}
+
+/*
+ * Finaliza el proceso actual sin liberar su stack
+ * mientras todavia esta ejecutandose sobre el.
+ */
+uint8_t exitCurrentProcess(void) {
+    uint64_t flags = saveAndDisableInterrupts();
+
+    Process *process = currentProcess;
+
+    if (process == NULL || process->state != PROCESS_RUNNING) {
+        restoreInterrupts(flags);
+        return 0;
+    }
+
+    process->state = PROCESS_TERMINATED;
+    wakeParentWaitingForChild(process);
+
+#if __STDC_HOSTED__
+    /*
+     * En los tests de Linux no se puede ejecutar INT 0x81.
+     * Se permite comprobar el cambio de estado.
+     */
+    restoreInterrupts(flags);
+    return 1;
+#else
+    /*
+     * El scheduler guardara el contexto, pero nunca
+     * volvera a seleccionar este proceso terminado.
+     *
+     * Mantenemos las interrupciones deshabilitadas
+     * hasta realizar el cambio de contexto.
+     */
+    __asm__ volatile ("int $0x81" ::: "memory");
+
+    /*
+     * No deberia regresar a este contexto.
+     */
+    for (;;) {
+        __asm__ volatile ("cli; hlt");
+    }
+#endif
 }
 
 uint8_t setProcessPriority(uint64_t pid, uint64_t priority) {
