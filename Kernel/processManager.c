@@ -19,6 +19,25 @@ static uint64_t nextProcessIndex = 0;
 static Process *currentProcess = NULL;
 // Contexto de la shell, que todavía se ejecuta sin PCB.
 static uint64_t shellSavedStackPointer = 0;
+/*
+ * Creditos de planificacion por posicion de la tabla.
+ * Un proceso con mayor prioridad recibe mas turnos.
+ */
+static uint64_t schedulingCredits[MAX_PROCESSES] = {0};
+
+static uint64_t schedulingCreditOwner[MAX_PROCESSES] = {0};
+
+static uint64_t schedulingWeight(uint64_t priority) {
+    if (priority == 0) {
+        return 1;
+    }
+
+    if (priority > 5) {
+        return 5;
+    }
+
+    return priority;
+}
 
 /*
  * Guarda el estado de las interrupciones y las desactiva.
@@ -107,6 +126,11 @@ void initializeProcessManager(void) {
     nextProcessIndex = 0;
     currentProcess = NULL;
     shellSavedStackPointer = 0;
+
+    for (uint64_t i = 0; i < MAX_PROCESSES; i++) {
+        schedulingCredits[i] = 0;
+        schedulingCreditOwner[i] = 0;
+    }
 }
 
 /*
@@ -357,10 +381,35 @@ Process *selectNextReadyProcess(void) {
 
         Process *process = getProcessAt(index);
 
-        if (process != NULL && process->state == PROCESS_READY) {
-            nextProcessIndex = (index + 1) % MAX_PROCESSES;
-            return process;
+        if (process == NULL || process->state != PROCESS_READY) {
+            schedulingCredits[index] = 0;
+            schedulingCreditOwner[index] = 0;
+            continue;
         }
+
+        /*
+         * Si el slot ahora pertenece a otro PID,
+         * descartar los creditos del proceso anterior.
+         */
+        if (schedulingCreditOwner[index] != process->pid) {
+            schedulingCredits[index] = 0;
+            schedulingCreditOwner[index] = process->pid;
+        }
+
+        if (schedulingCredits[index] == 0) {
+            schedulingCredits[index] =
+                schedulingWeight(process->priority);
+        }
+
+        schedulingCredits[index]--;
+
+        if (schedulingCredits[index] == 0) {
+            nextProcessIndex = (index + 1) % MAX_PROCESSES;
+        } else {
+            nextProcessIndex = index;
+        }
+
+        return process;
     }
 
     return NULL;
@@ -466,6 +515,17 @@ uint8_t setProcessPriority(uint64_t pid, uint64_t priority) {
     }
 
     process->priority = priority;
+
+    /*
+    * Invalidar los creditos pendientes para que
+    * el nuevo valor se aplique inmediatamente.
+    */
+    for (uint64_t i = 0; i < MAX_PROCESSES; i++) {
+        if (getProcessAt(i) == process) {
+            schedulingCredits[i] = 0;
+            break;
+        }
+    }
 
     restoreInterrupts(flags);
     return 1;
