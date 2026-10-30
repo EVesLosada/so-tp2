@@ -76,4 +76,16 @@ uint8_t enqueueSemaphoreWaiter(
 );
 uint64_t dequeueSemaphoreWaiter(Semaphore *sem);
 
+
+/*
+ * Administracion de semaforos con nombre.
+ *
+ * semCreate: devuelve un ID valido o 0 si falla.
+ * semOpen: devuelve el ID existente o 0 si falla.
+ * semClose: devuelve 1 si cierra correctamente, 0 si falla.
+ */
+uint64_t semCreate(const char *name, uint64_t initialValue);
+uint64_t semOpen(const char *name);
+uint8_t semClose(uint64_t id);
+
 #endif

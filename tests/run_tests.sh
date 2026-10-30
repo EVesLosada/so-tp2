@@ -81,4 +81,8 @@ run_test test_semaphore \
     Kernel/semaphore.c
 
 echo
+run_test test_semaphore_management \
+    tests/test_semaphore_management.c \
+    Kernel/semaphore.c
+
 echo "OK: todos los tests auxiliares superados"

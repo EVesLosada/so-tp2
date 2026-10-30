@@ -26,6 +26,9 @@ GLOBAL sysNice
 GLOBAL sysBlock
 GLOBAL sysUnblock
 GLOBAL sysYield
+GLOBAL sysSemCreate
+GLOBAL sysSemOpen
+GLOBAL sysSemClose
 
 section .text
 
@@ -208,5 +211,26 @@ sysFree:
 ; RAX = 1 si tuvo exito, 0 si fallo
 sysMemInfo:
     mov rax, SYS_MEM_INFO
+    int 0x80
+    ret
+
+; uint64_t sysSemCreate(const char *name, uint64_t initialValue)
+; RDI = nombre, RSI = valor inicial
+sysSemCreate:
+    mov rax, SYS_SEM_CREATE
+    int 0x80
+    ret
+
+; uint64_t sysSemOpen(const char *name)
+; RDI = nombre
+sysSemOpen:
+    mov rax, SYS_SEM_OPEN
+    int 0x80
+    ret
+
+; uint64_t sysSemClose(uint64_t id)
+; RDI = ID
+sysSemClose:
+    mov rax, SYS_SEM_CLOSE
     int 0x80
     ret

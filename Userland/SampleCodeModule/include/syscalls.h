@@ -111,4 +111,10 @@ uint64_t sysUnblock(uint64_t pid);
 
 /* Cede voluntariamente la CPU. Retorna 1 al reanudarse. */
 uint64_t sysYield(void);
+
+/* Administracion de semaforos. */
+uint64_t sysSemCreate(const char *name, uint64_t initialValue);
+uint64_t sysSemOpen(const char *name);
+uint64_t sysSemClose(uint64_t id);
+
 #endif

@@ -1,3 +1,4 @@
+#include <semaphore.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <syscalls.h>
@@ -248,7 +249,7 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
 
         case SYS_FONT_DOWN:
             return sysFontDown();
-        
+
         case SYS_GET_REGS:
             return sysGetRegisters((RegisterFrame *) frame->rdi);
 
@@ -393,6 +394,36 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
 
             return terminateProcess(pid);
         }
+
+        /*
+        * Crear un semaforo con nombre.
+        * RDI = nombre
+        * RSI = valor inicial
+        * RAX = ID o 0 si falla
+        */
+        case SYS_SEM_CREATE:
+            return semCreate(
+                (const char *)(uintptr_t)frame->rdi,
+                frame->rsi
+            );
+
+        /*
+        * Abrir un semaforo existente.
+        * RDI = nombre
+        * RAX = ID o 0 si falla
+        */
+        case SYS_SEM_OPEN:
+            return semOpen(
+                (const char *)(uintptr_t)frame->rdi
+            );
+
+        /*
+        * Cerrar una apertura.
+        * RDI = ID
+        * RAX = 1 si tuvo exito, 0 si falla
+        */
+        case SYS_SEM_CLOSE:
+            return semClose(frame->rdi);
 
         /*
          * Esperar la finalizacion de un hijo directo.

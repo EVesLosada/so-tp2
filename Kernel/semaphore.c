@@ -131,3 +131,194 @@ uint64_t dequeueSemaphoreWaiter(Semaphore *sem) {
     leaveCriticalSection(flags);
     return pid;
 }
+
+/*
+ * Proximo identificador disponible.
+ * El ID 0 se reserva para indicar error.
+ */
+static uint64_t nextSemaphoreId = 1;
+
+/*
+ * Compara dos nombres validos.
+ */
+static uint8_t semaphoreNamesEqual(
+    const char *first,
+    const char *second
+) {
+    for (uint64_t i = 0; i < SEMAPHORE_NAME_MAX_LENGTH; i++) {
+        if (first[i] != second[i]) {
+            return 0;
+        }
+
+        if (first[i] == '\0') {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * Comprueba que el nombre no este vacio y que
+ * termine antes de alcanzar el limite.
+ */
+static uint8_t validSemaphoreName(const char *name) {
+    if (name == NULL) {
+        return 0;
+    }
+
+    for (uint64_t i = 0; i < SEMAPHORE_NAME_MAX_LENGTH; i++) {
+        if (name[i] == '\0') {
+            return i > 0;
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * Crea un semaforo nuevo.
+ */
+uint64_t semCreate(const char *name, uint64_t initialValue) {
+    if (!validSemaphoreName(name)) {
+        return 0;
+    }
+
+    uint64_t flags = enterCriticalSection();
+    Semaphore *freeSlot = NULL;
+
+    for (uint64_t i = 0; i < MAX_SEMAPHORES; i++) {
+        Semaphore *sem = &semaphoreTable[i];
+
+        if (sem->inUse) {
+            if (semaphoreNamesEqual(sem->name, name)) {
+                leaveCriticalSection(flags);
+                return 0;
+            }
+        } else if (freeSlot == NULL) {
+            freeSlot = sem;
+        }
+    }
+
+    if (freeSlot == NULL || nextSemaphoreId == 0) {
+        leaveCriticalSection(flags);
+        return 0;
+    }
+
+    freeSlot->inUse = 1;
+    freeSlot->id = nextSemaphoreId++;
+    freeSlot->value = initialValue;
+    freeSlot->openCount = 1;
+    freeSlot->waitingHead = 0;
+    freeSlot->waitingTail = 0;
+    freeSlot->waitingCount = 0;
+
+    for (uint64_t i = 0; i < SEMAPHORE_NAME_MAX_LENGTH; i++) {
+        freeSlot->name[i] = name[i];
+
+        if (name[i] == '\0') {
+            break;
+        }
+    }
+
+    for (uint64_t i = 0; i < SEMAPHORE_MAX_WAITERS; i++) {
+        freeSlot->waitingPids[i] = 0;
+    }
+
+    uint64_t id = freeSlot->id;
+    leaveCriticalSection(flags);
+    return id;
+}
+
+/*
+ * Abre un semaforo existente por nombre.
+ */
+uint64_t semOpen(const char *name) {
+    if (!validSemaphoreName(name)) {
+        return 0;
+    }
+
+    uint64_t flags = enterCriticalSection();
+
+    for (uint64_t i = 0; i < MAX_SEMAPHORES; i++) {
+        Semaphore *sem = &semaphoreTable[i];
+
+        if (sem->inUse &&
+            semaphoreNamesEqual(sem->name, name)) {
+
+            if (sem->openCount == UINT64_MAX) {
+                leaveCriticalSection(flags);
+                return 0;
+            }
+
+            sem->openCount++;
+            uint64_t id = sem->id;
+
+            leaveCriticalSection(flags);
+            return id;
+        }
+    }
+
+    leaveCriticalSection(flags);
+    return 0;
+}
+
+/*
+ * Cierra una apertura del semaforo.
+ */
+uint8_t semClose(uint64_t id) {
+    if (id == 0) {
+        return 0;
+    }
+
+    uint64_t flags = enterCriticalSection();
+
+    for (uint64_t i = 0; i < MAX_SEMAPHORES; i++) {
+        Semaphore *sem = &semaphoreTable[i];
+
+        if (!sem->inUse || sem->id != id) {
+            continue;
+        }
+
+        if (sem->openCount == 0) {
+            leaveCriticalSection(flags);
+            return 0;
+        }
+
+        /*
+         * No eliminar el semaforo si todavia
+         * hay procesos esperando.
+         */
+        if (sem->openCount == 1 && sem->waitingCount > 0) {
+            leaveCriticalSection(flags);
+            return 0;
+        }
+
+        sem->openCount--;
+
+        if (sem->openCount == 0) {
+            sem->inUse = 0;
+            sem->id = 0;
+            sem->value = 0;
+            sem->waitingHead = 0;
+            sem->waitingTail = 0;
+            sem->waitingCount = 0;
+
+            for (uint64_t j = 0;
+                 j < SEMAPHORE_NAME_MAX_LENGTH; j++) {
+                sem->name[j] = '\0';
+            }
+
+            for (uint64_t j = 0;
+                 j < SEMAPHORE_MAX_WAITERS; j++) {
+                sem->waitingPids[j] = 0;
+            }
+        }
+
+        leaveCriticalSection(flags);
+        return 1;
+    }
+
+    leaveCriticalSection(flags);
+    return 0;
+}
