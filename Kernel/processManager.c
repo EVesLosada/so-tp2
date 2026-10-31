@@ -596,7 +596,8 @@ uint8_t unblockProcess(uint64_t pid) {
     uint8_t result = 0;
 
     if (process != NULL &&
-        process->state == PROCESS_BLOCKED) {
+        process->state == PROCESS_BLOCKED &&
+        process->waitingSemaphoreId == 0) {
 
         process->state = PROCESS_READY;
         result = 1;
@@ -813,4 +814,34 @@ uint64_t schedule(uint64_t savedRsp) {
     for (;;) {
         __asm__ volatile ("hlt");
     }
+}
+
+/*
+ * Desbloquea un proceso que esperaba este semaforo.
+ *
+ * El desbloqueo manual no puede realizar esta operacion.
+ */
+uint8_t unblockProcessFromSemaphore(
+    uint64_t pid,
+    uint64_t semaphoreId
+) {
+    if (pid == 0 || semaphoreId == 0) {
+        return 0;
+    }
+
+    uint64_t flags = saveAndDisableInterrupts();
+    Process *process = findProcessByPid(pid);
+
+    if (process == NULL ||
+        process->state != PROCESS_BLOCKED ||
+        process->waitingSemaphoreId != semaphoreId) {
+        restoreInterrupts(flags);
+        return 0;
+    }
+
+    process->waitingSemaphoreId = 0;
+    process->state = PROCESS_READY;
+
+    restoreInterrupts(flags);
+    return 1;
 }

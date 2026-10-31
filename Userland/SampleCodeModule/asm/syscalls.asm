@@ -29,6 +29,8 @@ GLOBAL sysYield
 GLOBAL sysSemCreate
 GLOBAL sysSemOpen
 GLOBAL sysSemClose
+GLOBAL sysSemWait
+GLOBAL sysSemPost
 
 section .text
 
@@ -232,5 +234,19 @@ sysSemOpen:
 ; RDI = ID
 sysSemClose:
     mov rax, SYS_SEM_CLOSE
+    int 0x80
+    ret
+
+; uint64_t sysSemWait(uint64_t id)
+; RDI = ID del semaforo
+sysSemWait:
+    mov rax, SYS_SEM_WAIT
+    int 0x80
+    ret
+
+; uint64_t sysSemPost(uint64_t id)
+; RDI = ID del semaforo
+sysSemPost:
+    mov rax, SYS_SEM_POST
     int 0x80
     ret

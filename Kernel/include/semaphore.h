@@ -87,5 +87,8 @@ uint64_t dequeueSemaphoreWaiter(Semaphore *sem);
 uint64_t semCreate(const char *name, uint64_t initialValue);
 uint64_t semOpen(const char *name);
 uint8_t semClose(uint64_t id);
+uint8_t semCancelWaiter(uint64_t pid);
+uint8_t semWait(uint64_t id);
+uint8_t semPost(uint64_t id);
 
 #endif

@@ -85,4 +85,18 @@ run_test test_semaphore_management \
     tests/test_semaphore_management.c \
     Kernel/semaphore.c
 
+run_test test_semaphore_wait \
+    tests/test_semaphore_wait.c \
+    Kernel/semaphore.c \
+    Kernel/semaphoreSync.c
+
+run_test test_semaphore_post \
+    tests/test_semaphore_post.c \
+    Kernel/semaphore.c \
+    Kernel/semaphoreSync.c
+
+run_test test_semaphore_cancel \
+    tests/test_semaphore_cancel.c \
+    Kernel/semaphore.c
+
 echo "OK: todos los tests auxiliares superados"

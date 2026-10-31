@@ -392,7 +392,11 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
                 return exitCurrentProcess();
             }
 
-            return terminateProcess(pid);
+            uint8_t terminated = terminateProcess(pid);
+            if (terminated) {
+                semCancelWaiter(pid);
+            }
+            return terminated;
         }
 
         /*
@@ -424,6 +428,14 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
         */
         case SYS_SEM_CLOSE:
             return semClose(frame->rdi);
+
+        /* Esperar un recurso del semaforo. */
+        case SYS_SEM_WAIT:
+            return semWait(frame->rdi);
+
+        /* Publicar un recurso del semaforo. */
+        case SYS_SEM_POST:
+            return semPost(frame->rdi);
 
         /*
          * Esperar la finalizacion de un hijo directo.

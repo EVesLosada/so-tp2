@@ -116,5 +116,7 @@ uint64_t sysYield(void);
 uint64_t sysSemCreate(const char *name, uint64_t initialValue);
 uint64_t sysSemOpen(const char *name);
 uint64_t sysSemClose(uint64_t id);
+uint64_t sysSemWait(uint64_t id);
+uint64_t sysSemPost(uint64_t id);
 
 #endif

@@ -62,6 +62,9 @@ typedef struct Process {
      */
     uint64_t waitingForChildPid;
 
+    /* 0 si no espera un semaforo. */
+    uint64_t waitingSemaphoreId;
+
     /*
      * Indica si el proceso ocupa el foreground.
      */

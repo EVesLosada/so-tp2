@@ -322,3 +322,62 @@ uint8_t semClose(uint64_t id) {
     leaveCriticalSection(flags);
     return 0;
 }
+
+/*
+ * Elimina un PID terminado de todas las colas de espera.
+ * Conserva el orden FIFO de los demas procesos.
+ *
+ * Retorna 1 si elimino alguna espera; 0 en caso contrario.
+ */
+uint8_t semCancelWaiter(uint64_t pid) {
+    if (pid == 0) {
+        return 0;
+    }
+
+    uint64_t flags = enterCriticalSection();
+    uint8_t removed = 0;
+
+    for (uint64_t i = 0; i < MAX_SEMAPHORES; i++) {
+        Semaphore *sem = &semaphoreTable[i];
+
+        if (!sem->inUse || sem->waitingCount == 0) {
+            continue;
+        }
+
+        uint64_t originalCount = sem->waitingCount;
+        uint64_t kept = 0;
+
+        for (uint64_t j = 0; j < originalCount; j++) {
+            uint64_t readIndex =
+                (sem->waitingHead + j) % SEMAPHORE_MAX_WAITERS;
+
+            uint64_t waitingPid = sem->waitingPids[readIndex];
+
+            if (waitingPid == pid) {
+                removed = 1;
+                continue;
+            }
+
+            uint64_t writeIndex =
+                (sem->waitingHead + kept) % SEMAPHORE_MAX_WAITERS;
+
+            sem->waitingPids[writeIndex] = waitingPid;
+            kept++;
+        }
+
+        /* Limpiar las posiciones que quedaron libres. */
+        for (uint64_t j = kept; j < originalCount; j++) {
+            uint64_t index =
+                (sem->waitingHead + j) % SEMAPHORE_MAX_WAITERS;
+
+            sem->waitingPids[index] = 0;
+        }
+
+        sem->waitingCount = kept;
+        sem->waitingTail =
+            (sem->waitingHead + kept) % SEMAPHORE_MAX_WAITERS;
+    }
+
+    leaveCriticalSection(flags);
+    return removed;
+}

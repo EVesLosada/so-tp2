@@ -88,6 +88,9 @@ uint8_t blockProcess(uint64_t pid);
  */
 uint8_t unblockProcess(uint64_t pid);
 
+/* Desbloqueo autorizado por el semaforo correspondiente. */
+uint8_t unblockProcessFromSemaphore(uint64_t pid, uint64_t semaphoreId);
+
 /*
  * Marca como terminado un proceso READY o BLOCKED.
  *
