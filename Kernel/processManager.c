@@ -248,6 +248,27 @@ static uint64_t createProcessInternal(
     process->foreground = foreground != 0;
     process->state = PROCESS_READY;
 
+    /*
+     * Todos los procesos comienzan con entrada por
+     * teclado y salida por terminal.
+     *
+     * El resto de los descriptores comienza libre
+     * gracias a la inicializacion del PCB en cero.
+     */
+    process->ioDescriptors[IO_FD_STDIN] = (IODescriptor){
+        .inUse = 1,
+        .permissions = IO_ACCESS_READ,
+        .type = IO_DESCRIPTOR_KEYBOARD,
+        .resourceId = 0
+    };
+
+    process->ioDescriptors[IO_FD_STDOUT] = (IODescriptor){
+        .inUse = 1,
+        .permissions = IO_ACCESS_WRITE,
+        .type = IO_DESCRIPTOR_TERMINAL,
+        .resourceId = 0
+    };
+
     process->stackBase = stack;
     process->stackSize = PROCESS_STACK_SIZE;
 

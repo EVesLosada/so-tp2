@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include <syscall_types.h>
+#include <ioDescriptor.h>
 
 #define MAX_PROCESSES 64
 #define PROCESS_STACK_SIZE (16UL * 1024UL)
@@ -69,6 +70,12 @@ typedef struct Process {
      * Indica si el proceso ocupa el foreground.
      */
     uint8_t foreground;
+
+    /*
+     * Tabla de descriptores de entrada/salida.
+     * Cada proceso posee sus propias entradas.
+     */
+    IODescriptor ioDescriptors[MAX_PROCESS_DESCRIPTORS];
 
 } Process;
 

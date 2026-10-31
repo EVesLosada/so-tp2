@@ -49,6 +49,23 @@ static void dummyEntry(void) {
 static void checkProcessContext(Process *process) {
     assert(process != NULL);
     assert(process->state == PROCESS_READY);
+    /* Los procesos nuevos comienzan con stdin y stdout. */
+    assert(process->ioDescriptors[IO_FD_STDIN].inUse == 1);
+    assert(process->ioDescriptors[IO_FD_STDIN].type ==
+           IO_DESCRIPTOR_KEYBOARD);
+    assert(process->ioDescriptors[IO_FD_STDIN].permissions ==
+           IO_ACCESS_READ);
+
+    assert(process->ioDescriptors[IO_FD_STDOUT].inUse == 1);
+    assert(process->ioDescriptors[IO_FD_STDOUT].type ==
+           IO_DESCRIPTOR_TERMINAL);
+    assert(process->ioDescriptors[IO_FD_STDOUT].permissions ==
+           IO_ACCESS_WRITE);
+
+    for (uint64_t fd = 2; fd < MAX_PROCESS_DESCRIPTORS; fd++) {
+        assert(process->ioDescriptors[fd].inUse == 0);
+    }
+
     assert(process->stackBase != NULL);
     assert(process->stackSize == PROCESS_STACK_SIZE);
 

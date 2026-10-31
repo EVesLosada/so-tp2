@@ -11,48 +11,10 @@
 #include <cracker.h>
 #include <memoryManager.h>
 #include <processManager.h>
-
-#define STDIN  0
-#define STDOUT 1
+#include <ioDescriptor.h>
 
 #define MIN_FONT_SCALE 1
 #define MAX_FONT_SCALE 3
-
-/*
- * Escribe caracteres en la terminal.
- *
- * Retorna la cantidad de caracteres escritos.
- */
-static uint64_t sysWrite(uint64_t fd, const char *buffer, uint64_t count) {
-    if (fd != STDOUT || buffer == 0) {
-        return 0;
-    }
-
-    for (uint64_t i = 0; i < count; i++) {
-        terminalPutChar(buffer[i]);
-    }
-
-    return count;
-}
-
-/*
- * Lee caracteres disponibles desde el buffer de teclado.
- *
- * Retorna la cantidad de caracteres leidos.
- */
-static uint64_t sysRead(uint64_t fd, char *buffer, uint64_t count) {
-    if (fd != STDIN || buffer == 0 || count == 0) {
-        return 0;
-    }
-
-    uint64_t readCount = 0;
-
-    while (readCount < count && keyboardReadChar(&buffer[readCount])) {
-        readCount++;
-    }
-
-    return readCount;
-}
 
 /*
  * Limpia completamente la terminal y reinicia el cursor.
@@ -228,14 +190,14 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
 
     switch (frame->rax) {
         case SYS_WRITE:
-            return sysWrite(
+            return ioWrite(
                 frame->rdi,
                 (const char *) frame->rsi,
                 frame->rdx
             );
 
         case SYS_READ:
-            return sysRead(
+            return ioRead(
                 frame->rdi,
                 (char *) frame->rsi,
                 frame->rdx

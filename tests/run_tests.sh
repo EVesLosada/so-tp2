@@ -99,4 +99,8 @@ run_test test_semaphore_cancel \
     tests/test_semaphore_cancel.c \
     Kernel/semaphore.c
 
+run_test test_io_descriptors \
+    tests/test_io_descriptors.c \
+    Kernel/ioDescriptor.c
+
 echo "OK: todos los tests auxiliares superados"
