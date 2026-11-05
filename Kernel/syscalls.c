@@ -12,6 +12,7 @@
 #include <memoryManager.h>
 #include <processManager.h>
 #include <ioDescriptor.h>
+#include <pipe.h>
 
 #define MIN_FONT_SCALE 1
 #define MAX_FONT_SCALE 3
@@ -367,6 +368,28 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
         * RSI = valor inicial
         * RAX = ID o 0 si falla
         */
+        /*
+         * Crear un pipe con nombre.
+         * RDI = nombre.
+         * RAX = ID del pipe o 0 si falla.
+         */
+        case SYS_PIPE_CREATE:
+            return pipeCreate(
+                (const char *)(uintptr_t)frame->rdi
+            );
+
+        /*
+         * Abrir un extremo de un pipe existente.
+         * RDI = nombre.
+         * RSI = PIPE_READ o PIPE_WRITE.
+         * RAX = descriptor local o MAX_PROCESS_DESCRIPTORS.
+         */
+        case SYS_PIPE_OPEN:
+            return pipeOpenDescriptor(
+                (const char *)(uintptr_t)frame->rdi,
+                (PipeMode)frame->rsi
+            );
+
         case SYS_SEM_CREATE:
             return semCreate(
                 (const char *)(uintptr_t)frame->rdi,

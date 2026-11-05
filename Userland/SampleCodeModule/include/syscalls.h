@@ -113,6 +113,14 @@ uint64_t sysUnblock(uint64_t pid);
 uint64_t sysYield(void);
 
 /* Administracion de semaforos. */
+/*
+ * Pipes.
+ * sysPipeCreate devuelve un ID o 0 si falla.
+ * sysPipeOpen devuelve un descriptor local o 16 si falla.
+ */
+uint64_t sysPipeCreate(const char *name);
+uint64_t sysPipeOpen(const char *name, PipeMode mode);
+
 uint64_t sysSemCreate(const char *name, uint64_t initialValue);
 uint64_t sysSemOpen(const char *name);
 uint64_t sysSemClose(uint64_t id);

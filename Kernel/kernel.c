@@ -11,6 +11,7 @@
 #include <memoryManager.h>
 #include <processManager.h>
 #include <semaphore.h>
+#include <pipe.h>
 
 extern uint8_t text;
 extern uint8_t rodata;
@@ -140,6 +141,7 @@ int main()
 		*/
 		initializeProcessManager();
 		initializeSemaphoreTable();
+		initializePipeTable();
 
         //Registramos int 80h para que Userland pueda solicitar servicios.
         initializeInterrupts();

@@ -1,3 +1,5 @@
+global sysPipeOpen
+global sysPipeCreate
 %include "syscall_ids.inc"
 
 GLOBAL sysWrite
@@ -248,5 +250,19 @@ sysSemWait:
 ; RDI = ID del semaforo
 sysSemPost:
     mov rax, SYS_SEM_POST
+    int 0x80
+    ret
+
+; uint64_t sysPipeCreate(const char *name)
+; RDI = nombre
+sysPipeCreate:
+    mov rax, SYS_PIPE_CREATE
+    int 0x80
+    ret
+
+; uint64_t sysPipeOpen(const char *name, PipeMode mode)
+; RDI = nombre, RSI = modo
+sysPipeOpen:
+    mov rax, SYS_PIPE_OPEN
     int 0x80
     ret
