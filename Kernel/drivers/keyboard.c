@@ -11,6 +11,11 @@
  * y Userland los consume mediante SYS_READ desde readPosition.
  */
 static volatile char keyboardBuffer[KEYBOARD_BUFFER_SIZE];
+
+/* Estado de ambas teclas Shift. */
+static uint8_t leftShiftPressed = 0;
+static uint8_t rightShiftPressed = 0;
+
 static volatile uint64_t readPosition = 0;
 static volatile uint64_t writePosition = 0;
 
@@ -35,6 +40,34 @@ static const char keyMap[] = {
 };
 
 #define KEY_MAP_SIZE (sizeof(keyMap) / sizeof(keyMap[0]))
+
+/*
+ * Traduccion de letras y numeros con Shift.
+ *
+ * Mapeo inicial latinoamericano para la fila numerica.
+ * Los simbolos dependientes de AltGr se incorporaran
+ * junto con el soporte de teclado avanzado.
+ */
+static char translateShift(uint8_t scancode, char base) {
+    if (base >= 'a' && base <= 'z') {
+        return base - 'a' + 'A';
+    }
+
+    switch (scancode) {
+        case 0x02: return '!';
+        case 0x03: return '"';
+        case 0x04: return '#';
+        case 0x05: return '$';
+        case 0x06: return '%';
+        case 0x07: return '&';
+        case 0x08: return '/';
+        case 0x09: return '(';
+        case 0x0A: return ')';
+        case 0x0B: return '=';
+        default:   return base;
+    }
+}
+
 
 /*
  * Agrega un caracter al buffer circular.
@@ -65,6 +98,26 @@ void keyboardProcessScancode(uint8_t scancode, RegisterFrame *frame) {
      * En set 1, los codigos de liberacion tienen el bit alto en 1.
      * Solo almacenamos presiones de tecla.
      */
+    if (scancode == 0x2A) {
+        leftShiftPressed = 1;
+        return;
+    }
+
+    if (scancode == 0x36) {
+        rightShiftPressed = 1;
+        return;
+    }
+
+    if (scancode == 0xAA) {
+        leftShiftPressed = 0;
+        return;
+    }
+
+    if (scancode == 0xB6) {
+        rightShiftPressed = 0;
+        return;
+    }
+
     if (scancode & 0x80) {
         return;
     }
@@ -74,6 +127,11 @@ void keyboardProcessScancode(uint8_t scancode, RegisterFrame *frame) {
     }
 
     char character = keyMap[scancode];
+
+    if (leftShiftPressed || rightShiftPressed) {
+        character = translateShift(scancode, character);
+    }
+
 
     if (character != 0) {
         enqueueCharacter(character);

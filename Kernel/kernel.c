@@ -30,7 +30,7 @@ static void * const sampleCodeModuleAddress = (void *)USERLAND_MODULE_ADDRESS;
 
 static void * const sampleDataModuleAddress = (void *)DATA_MODULE_ADDRESS;
 
-typedef int (*EntryPoint)();
+
 
 
 void clearBSS(void * bssAddress, uint64_t bssSize)
@@ -143,16 +143,39 @@ int main()
 		initializeSemaphoreTable();
 		initializePipeTable();
 
-        //Registramos int 80h para que Userland pueda solicitar servicios.
+        /*
+         * La shell debe ser un proceso real para poder
+         * crear hijos y esperarlos mediante sysWait.
+         *
+         * Crear el proceso antes de habilitar las IRQ
+         * evita interrupciones durante su inicializacion.
+         */
+        uint64_t shellPid = createProcess(
+            "shell",
+            (void (*)(void))sampleCodeModuleAddress,
+            1,
+            0,
+            1
+        );
+
+        if (shellPid == 0) {
+            terminalPrint("Error: no se pudo crear la shell.\n");
+
+            for (;;) {
+                __asm__ volatile ("cli; hlt");
+            }
+        }
+
         initializeInterrupts();
 
-        /*El modulo cargado en 0x400000 pasa a ser el inicio
-         * de nuestra shell de Userland.*/
-        ((EntryPoint) sampleCodeModuleAddress)();
+        /*
+         * El scheduler inicia la shell.
+         * El contexto original queda como contexto idle.
+         */
+        __asm__ volatile ("int $0x81" ::: "memory");
 
-        /*La shell no deberia retornar.
-         * Si retorna por algun error, mantenemos el kernel activo.*/
-        while (1) {
+        for (;;) {
+            __asm__ volatile ("sti; hlt" ::: "memory");
         }
 
         return 0;

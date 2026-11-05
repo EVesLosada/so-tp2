@@ -170,3 +170,8 @@ run_test test_pipe_process_lifecycle \
     Kernel/pipeIO.c \
     Kernel/pipeSync.c \
     Kernel/pipeClose.c
+
+run_test test_shell_parser \
+    tests/test_shell_parser.c \
+    Userland/SampleCodeModule/shellParser.c \
+    -IUserland/SampleCodeModule/include

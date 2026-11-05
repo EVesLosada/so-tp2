@@ -1,8 +1,18 @@
 #include <stdint.h>
 #include <syscalls.h>
+#include <shellParser.h>
+#include <shellPrograms.h>
 #include <pacman.h>
 
 #define COMMAND_BUFFER_SIZE 64
+
+#define SHELL_BACKGROUND_CAPACITY 16
+#define SHELL_SNAPSHOT_CAPACITY 64
+
+static uint64_t backgroundPids[SHELL_BACKGROUND_CAPACITY];
+static uint64_t backgroundCount = 0;
+static ProcessInfo backgroundSnapshot[SHELL_SNAPSHOT_CAPACITY];
+
 #define TSC_FREQUENCY_HZ 2500000000ULL
 
 static uint64_t stringLength(const char *str);
@@ -241,6 +251,64 @@ static void printApproxSeconds(uint64_t cycles) {
  * al cambiar el tamaño de fuente, la shell vuelva a mostrar
  * la lista de comandos en el nuevo tamaño.
  */
+/*
+ * Recoge hijos en background que ya finalizaron.
+ *
+ * Nunca espera a un hijo que todavia esta ejecutandose.
+ */
+static void shellReapBackgroundChildren(void) {
+    if (backgroundCount == 0) {
+        return;
+    }
+
+    uint64_t count = sysPs(
+        backgroundSnapshot,
+        SHELL_SNAPSHOT_CAPACITY
+    );
+
+    uint64_t i = 0;
+
+    while (i < backgroundCount) {
+        uint64_t pid = backgroundPids[i];
+        uint8_t found = 0;
+        uint8_t reaped = 0;
+
+        for (uint64_t j = 0; j < count; j++) {
+            if (backgroundSnapshot[j].pid != pid) {
+                continue;
+            }
+
+            found = 1;
+
+            if (backgroundSnapshot[j].state ==
+                PROCESS_TERMINATED) {
+                reaped = (sysWait(pid) == pid);
+            }
+
+            break;
+        }
+
+        if (reaped) {
+            print("[bg] finalizado PID ");
+            printDecimal(pid);
+            print("\n");
+        } else if (!found) {
+            print("[bg] PID ya no registrado: ");
+            printDecimal(pid);
+            print("\n");
+        }
+
+        if (reaped || !found) {
+            backgroundCount--;
+            backgroundPids[i] =
+                backgroundPids[backgroundCount];
+            continue;
+        }
+
+        i++;
+    }
+}
+
 static void printHelp(void) {
     print("Comandos:\n");
     print("  help      - ayuda\n");
@@ -258,6 +326,8 @@ static void printHelp(void) {
     print("  sethash N - guardar hash\n");
     print("  gethash   - mostrar hash\n");
     print("  crack     - buscar password\n");
+    print("  echo      - imprimir argumentos\n");
+    print("  jobs      - procesos en background\n");
 }
 
 /*
@@ -267,7 +337,104 @@ static void printHelp(void) {
  * la funcionalidad correspondiente utilizando syscalls
  * hacia el kernel cuando es necesario.
  */
+typedef void (*ShellProgramEntry)(uint64_t argc, char **argv);
+
+/*
+ * Registro de programas ejecutables.
+ * Se ampliara al incorporar los comandos del TP2.
+ */
+static ShellProgramEntry findShellProgram(const char *name) {
+    if (stringsEqual(name, "echo")) {
+        return shellEchoProcess;
+    }
+
+    return 0;
+}
+
 static void executeCommand(const char *command) {
+    shellReapBackgroundChildren();
+    ShellParsedCommand parsed;
+
+    if (!shellParseCommand(command, &parsed)) {
+        print("Error: sintaxis de comando invalida\n");
+        return;
+    }
+
+    if (parsed.argc == 0) {
+        return;
+    }
+
+    ShellProgramEntry program =
+        findShellProgram(parsed.argv[0]);
+
+    if (program != 0) {
+        if (parsed.background &&
+            backgroundCount >= SHELL_BACKGROUND_CAPACITY) {
+            print("ERROR: demasiados procesos en background\n");
+            return;
+        }
+
+        uint64_t pid = sysCreateProcess(
+            parsed.argv[0],
+            program,
+            1,
+            parsed.background ? 0 : 1,
+            parsed.argc,
+            (const char *const *)parsed.argv
+        );
+
+        if (pid == 0) {
+            print("ERROR: no se pudo crear el proceso\n");
+            return;
+        }
+
+        if (parsed.background) {
+            backgroundPids[backgroundCount++] = pid;
+
+            print("[bg] iniciado PID ");
+            printDecimal(pid);
+            print("\n");
+            return;
+        }
+
+        print("Shell: esperando al hijo PID ");
+        printDecimal(pid);
+        print("\n");
+
+        if (sysWait(pid) == pid) {
+            print("Shell: hijo finalizado correctamente\n");
+        } else {
+            print("ERROR: sysWait fallo\n");
+        }
+
+        return;
+    }
+
+    if (parsed.background) {
+        print("Ese comando no admite background\n");
+        return;
+    }
+
+    if (stringsEqual(parsed.argv[0], "jobs")) {
+        print("[bg] pendientes: ");
+        printDecimal(backgroundCount);
+        print("\n");
+
+        for (uint64_t i = 0; i < backgroundCount; i++) {
+            print("[bg] PID ");
+            printDecimal(backgroundPids[i]);
+            print("\n");
+        }
+
+        return;
+    }
+
+    /*
+     * Los comandos internos existentes conservan
+     * su comportamiento anterior.
+     */
+    command = skipSpaces(command);
+
     if (stringsEqual(command, "help")) {
         printHelp();
         return;
