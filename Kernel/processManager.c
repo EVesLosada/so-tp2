@@ -1,3 +1,4 @@
+#include <pipeClose.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -495,6 +496,9 @@ uint8_t exitCurrentProcess(void) {
         return 0;
     }
 
+    /* Cerrar pipes antes de abandonar definitivamente la CPU. */
+    pipeCleanupProcess(process);
+
     process->state = PROCESS_TERMINATED;
     wakeParentWaitingForChild(process);
 
@@ -618,7 +622,8 @@ uint8_t unblockProcess(uint64_t pid) {
 
     if (process != NULL &&
         process->state == PROCESS_BLOCKED &&
-        process->waitingSemaphoreId == 0) {
+        process->waitingSemaphoreId == 0 &&
+        process->waitingPipeId == 0) {
 
         process->state = PROCESS_READY;
         result = 1;
@@ -639,7 +644,12 @@ uint8_t terminateProcess(uint64_t pid) {
         process->state != PROCESS_RUNNING &&
         process->state != PROCESS_TERMINATED) {
 
+        /*
+         * Marcarlo como terminado antes de limpiar sus recursos:
+         * ningun despertar debe volver a hacerlo ejecutable.
+         */
         process->state = PROCESS_TERMINATED;
+        pipeCleanupProcess(process);
         wakeParentWaitingForChild(process);
         result = 1;
     }
@@ -861,6 +871,46 @@ uint8_t unblockProcessFromSemaphore(
     }
 
     process->waitingSemaphoreId = 0;
+    process->state = PROCESS_READY;
+
+    restoreInterrupts(flags);
+    return 1;
+}
+
+
+/*
+ * Desbloqueo autorizado para una espera por pipe.
+ *
+ * Comprueba que el proceso este bloqueado esperando
+ * exactamente el pipe y el modo indicados.
+ */
+uint8_t unblockProcessFromPipe(
+    uint64_t pid,
+    uint64_t pipeId,
+    PipeMode mode
+) {
+    if (pid == 0 ||
+        pipeId == 0 ||
+        (mode != PIPE_READ && mode != PIPE_WRITE)) {
+        return 0;
+    }
+
+    uint64_t flags = saveAndDisableInterrupts();
+
+    Process *process = findProcessByPid(pid);
+
+    if (process == NULL ||
+        process->state != PROCESS_BLOCKED ||
+        process->waitingSemaphoreId != 0 ||
+        process->waitingPipeId != pipeId ||
+        process->waitingPipeMode != mode) {
+
+        restoreInterrupts(flags);
+        return 0;
+    }
+
+    process->waitingPipeId = 0;
+    process->waitingPipeMode = PIPE_READ;
     process->state = PROCESS_READY;
 
     restoreInterrupts(flags);

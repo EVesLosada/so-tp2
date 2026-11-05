@@ -3,10 +3,23 @@
 
 #include <stdint.h>
 #include <syscall_types.h>
+#include <process.h>
 
 #define MAX_PIPES 32
 #define PIPE_BUFFER_SIZE 512
 #define PIPE_NAME_MAX_LENGTH 32
+#define PIPE_MAX_WAITERS MAX_PROCESSES
+
+/*
+ * Cola FIFO de PIDs que esperan por un pipe.
+ *
+ * Las operaciones sobre la cola deben protegerse
+ * con una seccion critica.
+ */
+typedef struct {
+    uint64_t pids[PIPE_MAX_WAITERS];
+    uint64_t count;
+} PipeWaitQueue;
 
 typedef struct {
     uint8_t inUse;
@@ -20,6 +33,10 @@ typedef struct {
 
     uint64_t readers;
     uint64_t writers;
+
+    /* Procesos esperando datos o espacio libre. */
+    PipeWaitQueue readerWaiters;
+    PipeWaitQueue writerWaiters;
 } Pipe;
 
 void initializePipeTable(void);
@@ -57,5 +74,14 @@ uint64_t pipeBufferRead(
     uint8_t *destination,
     uint64_t count
 );
+
+
+/*
+ * Operaciones sobre las colas FIFO de espera.
+ * Todavia no bloquean ni desbloquean procesos.
+ */
+uint8_t pipeEnqueueWaiter(Pipe *pipe, PipeMode mode, uint64_t pid);
+uint64_t pipeDequeueWaiter(Pipe *pipe, PipeMode mode);
+uint8_t pipeRemoveWaiter(Pipe *pipe, PipeMode mode, uint64_t pid);
 
 #endif

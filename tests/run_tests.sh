@@ -35,29 +35,34 @@ run_test test_memory_region \
 run_test test_process_manager \
     tests/test_process_manager.c \
     Kernel/processManager.c \
+    tests/process_pipe_cleanup_stub.c \
     Kernel/processTable.c
 
 run_test test_process_real_freelist \
     tests/test_process_real_mm.c \
     Kernel/processManager.c \
+    tests/process_pipe_cleanup_stub.c \
     Kernel/processTable.c \
     Kernel/memoryManager.c
 
 run_test test_process_real_buddy \
     tests/test_process_real_mm.c \
     Kernel/processManager.c \
+    tests/process_pipe_cleanup_stub.c \
     Kernel/processTable.c \
     Kernel/allocators/buddyMemoryManager.c
 
 run_test test_process_args_freelist \
     tests/test_process_args.c \
     Kernel/processManager.c \
+    tests/process_pipe_cleanup_stub.c \
     Kernel/processTable.c \
     Kernel/memoryManager.c
 
 run_test test_process_args_buddy \
     tests/test_process_args.c \
     Kernel/processManager.c \
+    tests/process_pipe_cleanup_stub.c \
     Kernel/processTable.c \
     Kernel/allocators/buddyMemoryManager.c
 
@@ -65,12 +70,14 @@ run_test test_process_table \
   tests/test_process_table.c \
   Kernel/processTable.c \
   Kernel/processManager.c \
+    tests/process_pipe_cleanup_stub.c \
   Kernel/memoryManager.c
 
 run_test test_scheduler \
   tests/test_scheduler.c \
   Kernel/processTable.c \
   Kernel/processManager.c \
+    tests/process_pipe_cleanup_stub.c \
   Kernel/memoryManager.c
 
 run_test test_atomic_ops \
@@ -104,3 +111,62 @@ run_test test_io_descriptors \
     Kernel/ioDescriptor.c
 
 echo "OK: todos los tests auxiliares superados"
+
+
+run_test test_pipe \
+    tests/test_pipe.c \
+    tests/pipe_descriptor_stubs.c \
+    Kernel/pipe.c
+
+run_test test_pipe_descriptors \
+    tests/test_pipe_descriptors.c \
+    Kernel/pipe.c
+
+run_test test_pipe_wait_queue \
+    tests/test_pipe_wait_queue.c \
+    tests/pipe_descriptor_stubs.c \
+    Kernel/pipe.c
+
+run_test test_pipe_wakeup \
+    tests/test_pipe_wakeup.c \
+    tests/pipe_descriptor_stubs.c \
+    Kernel/pipe.c \
+    Kernel/pipeSync.c
+
+run_test test_pipe_read \
+    tests/test_pipe_read.c \
+    tests/pipe_descriptor_stubs.c \
+    Kernel/pipe.c \
+    Kernel/pipeSync.c \
+    Kernel/pipeIO.c
+
+run_test test_pipe_write \
+    tests/test_pipe_write.c \
+    tests/pipe_descriptor_stubs.c \
+    Kernel/pipe.c \
+    Kernel/pipeSync.c \
+    Kernel/pipeIO.c
+
+run_test test_pipe_close \
+    tests/test_pipe_close.c \
+    Kernel/pipe.c \
+    Kernel/pipeSync.c \
+    Kernel/pipeClose.c
+
+run_test test_pipe_integration \
+    tests/test_pipe_integration.c \
+    Kernel/ioDescriptor.c \
+    Kernel/pipe.c \
+    Kernel/pipeIO.c \
+    Kernel/pipeSync.c \
+    Kernel/pipeClose.c
+
+run_test test_pipe_process_lifecycle \
+    tests/test_pipe_process_lifecycle.c \
+    Kernel/processManager.c \
+    Kernel/processTable.c \
+    Kernel/ioDescriptor.c \
+    Kernel/pipe.c \
+    Kernel/pipeIO.c \
+    Kernel/pipeSync.c \
+    Kernel/pipeClose.c

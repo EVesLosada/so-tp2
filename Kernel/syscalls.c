@@ -1,3 +1,4 @@
+#include <pipeClose.h>
 #include <semaphore.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -384,6 +385,9 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
          * RSI = PIPE_READ o PIPE_WRITE.
          * RAX = descriptor local o MAX_PROCESS_DESCRIPTORS.
          */
+        case SYS_CLOSE:
+            return pipeCloseCurrentDescriptor(frame->rdi);
+
         case SYS_PIPE_OPEN:
             return pipeOpenDescriptor(
                 (const char *)(uintptr_t)frame->rdi,

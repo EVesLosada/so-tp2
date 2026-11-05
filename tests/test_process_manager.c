@@ -149,6 +149,73 @@ static void testProcessSnapshot(void) {
     printf("OK: snapshot de procesos superado\n");
 }
 
+
+/*
+ * Verifica que las esperas por pipes solo puedan
+ * desbloquearse con el pipe y el modo correctos.
+ */
+static void testPipeAuthorizedWakeup(void) {
+    assert(activeAllocations == 0);
+    initializeProcessManager();
+
+    uint64_t pid = createProcess(
+        "pipe_wait", dummyEntry, 1, 0, 0
+    );
+    assert(pid != 0);
+
+    Process *process = findProcessByPid(pid);
+    assert(process != NULL);
+
+    /* Simular que espera datos del pipe 42. */
+    process->waitingPipeId = 42;
+    process->waitingPipeMode = PIPE_READ;
+
+    assert(blockProcess(pid) == 1);
+    assert(process->state == PROCESS_BLOCKED);
+
+    /* El desbloqueo manual debe estar prohibido. */
+    assert(unblockProcess(pid) == 0);
+    assert(process->state == PROCESS_BLOCKED);
+
+    /* Rechazar PID, pipe y modo incorrectos. */
+    assert(unblockProcessFromPipe(0, 42, PIPE_READ) == 0);
+    assert(unblockProcessFromPipe(pid, 0, PIPE_READ) == 0);
+    assert(unblockProcessFromPipe(pid, 43, PIPE_READ) == 0);
+    assert(unblockProcessFromPipe(pid, 42, PIPE_WRITE) == 0);
+    assert(unblockProcessFromPipe(pid, 42, (PipeMode)99) == 0);
+
+    assert(process->state == PROCESS_BLOCKED);
+    assert(process->waitingPipeId == 42);
+
+    /* El desbloqueo correcto debe funcionar. */
+    assert(unblockProcessFromPipe(pid, 42, PIPE_READ) == 1);
+    assert(process->state == PROCESS_READY);
+    assert(process->waitingPipeId == 0);
+
+    /* No se puede desbloquear dos veces. */
+    assert(unblockProcessFromPipe(pid, 42, PIPE_READ) == 0);
+
+    /* Repetir para un proceso esperando espacio de escritura. */
+    process->waitingPipeId = 42;
+    process->waitingPipeMode = PIPE_WRITE;
+
+    assert(blockProcess(pid) == 1);
+    assert(unblockProcess(pid) == 0);
+    assert(unblockProcessFromPipe(pid, 42, PIPE_READ) == 0);
+    assert(unblockProcessFromPipe(pid, 42, PIPE_WRITE) == 1);
+
+    assert(process->state == PROCESS_READY);
+    assert(process->waitingPipeId == 0);
+
+    /* Limpiar el proceso de prueba. */
+    assert(terminateProcess(pid) == 1);
+    assert(reapTerminatedProcesses() == 1);
+    assert(getProcessCount() == 0);
+    assert(activeAllocations == 0);
+
+    puts("OK: desbloqueo autorizado de pipes");
+}
+
 int main(void) {
     initializeProcessManager();
 
@@ -685,6 +752,7 @@ int main(void) {
     puts("OK: cambios de prioridad superados");
 
     puts("OK: pruebas del administrador de procesos superadas");
+    testPipeAuthorizedWakeup();
     testProcessSnapshot();
     return 0;
 }

@@ -127,4 +127,7 @@ uint64_t sysSemClose(uint64_t id);
 uint64_t sysSemWait(uint64_t id);
 uint64_t sysSemPost(uint64_t id);
 
+/* Cierra un descriptor de pipe. Devuelve 1 si tuvo exito. */
+uint64_t sysClose(uint64_t fd);
+
 #endif

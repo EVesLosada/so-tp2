@@ -67,6 +67,13 @@ typedef struct Process {
     uint64_t waitingSemaphoreId;
 
     /*
+     * Pipe que esta esperando, o 0 si no espera ninguno.
+     * El modo indica si espera datos o espacio disponible.
+     */
+    uint64_t waitingPipeId;
+    PipeMode waitingPipeMode;
+
+    /*
      * Indica si el proceso ocupa el foreground.
      */
     uint8_t foreground;

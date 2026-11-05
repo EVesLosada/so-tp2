@@ -266,3 +266,10 @@ sysPipeOpen:
     mov rax, SYS_PIPE_OPEN
     int 0x80
     ret
+
+global sysClose
+
+sysClose:
+    mov rax, SYS_CLOSE
+    int 0x80
+    ret

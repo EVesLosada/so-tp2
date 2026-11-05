@@ -92,6 +92,17 @@ uint8_t unblockProcess(uint64_t pid);
 uint8_t unblockProcessFromSemaphore(uint64_t pid, uint64_t semaphoreId);
 
 /*
+ * Desbloquea un proceso que espera un pipe especifico.
+ * Solo el subsistema de pipes debe llamar esta funcion.
+ */
+uint8_t unblockProcessFromPipe(
+    uint64_t pid,
+    uint64_t pipeId,
+    PipeMode mode
+);
+
+
+/*
  * Marca como terminado un proceso READY o BLOCKED.
  *
  * No permite terminar directamente un proceso RUNNING.

@@ -268,3 +268,131 @@ uint8_t pipeReleaseEndpoint(uint64_t pipeId, PipeMode mode) {
     leaveCriticalSection(flags);
     return 1;
 }
+
+
+/*
+ * Selecciona la cola correspondiente al extremo.
+ * Debe utilizarse dentro de una seccion critica.
+ */
+static PipeWaitQueue *getPipeWaitQueue(
+    Pipe *pipe,
+    PipeMode mode
+) {
+    if (pipe == NULL || !pipe->inUse) {
+        return NULL;
+    }
+
+    if (mode == PIPE_READ) {
+        return &pipe->readerWaiters;
+    }
+
+    if (mode == PIPE_WRITE) {
+        return &pipe->writerWaiters;
+    }
+
+    return NULL;
+}
+
+/*
+ * Agrega un PID al final de la cola FIFO.
+ * Rechaza PIDs nulos, duplicados y colas llenas.
+ */
+uint8_t pipeEnqueueWaiter(
+    Pipe *pipe,
+    PipeMode mode,
+    uint64_t pid
+) {
+    if (pid == 0) {
+        return 0;
+    }
+
+    uint64_t flags = enterCriticalSection();
+    PipeWaitQueue *queue = getPipeWaitQueue(pipe, mode);
+
+    if (queue == NULL || queue->count >= PIPE_MAX_WAITERS) {
+        leaveCriticalSection(flags);
+        return 0;
+    }
+
+    for (uint64_t i = 0; i < queue->count; i++) {
+        if (queue->pids[i] == pid) {
+            leaveCriticalSection(flags);
+            return 0;
+        }
+    }
+
+    queue->pids[queue->count++] = pid;
+
+    leaveCriticalSection(flags);
+    return 1;
+}
+
+/*
+ * Retira el primer PID de la cola.
+ * Devuelve 0 si la cola esta vacia o es invalida.
+ */
+uint64_t pipeDequeueWaiter(
+    Pipe *pipe,
+    PipeMode mode
+) {
+    uint64_t flags = enterCriticalSection();
+    PipeWaitQueue *queue = getPipeWaitQueue(pipe, mode);
+
+    if (queue == NULL || queue->count == 0) {
+        leaveCriticalSection(flags);
+        return 0;
+    }
+
+    uint64_t pid = queue->pids[0];
+
+    for (uint64_t i = 1; i < queue->count; i++) {
+        queue->pids[i - 1] = queue->pids[i];
+    }
+
+    queue->count--;
+    queue->pids[queue->count] = 0;
+
+    leaveCriticalSection(flags);
+    return pid;
+}
+
+/*
+ * Elimina un PID especifico conservando el orden FIFO.
+ * Sera util para cancelar esperas de procesos terminados.
+ */
+uint8_t pipeRemoveWaiter(
+    Pipe *pipe,
+    PipeMode mode,
+    uint64_t pid
+) {
+    if (pid == 0) {
+        return 0;
+    }
+
+    uint64_t flags = enterCriticalSection();
+    PipeWaitQueue *queue = getPipeWaitQueue(pipe, mode);
+
+    if (queue == NULL) {
+        leaveCriticalSection(flags);
+        return 0;
+    }
+
+    for (uint64_t i = 0; i < queue->count; i++) {
+        if (queue->pids[i] != pid) {
+            continue;
+        }
+
+        for (uint64_t j = i + 1; j < queue->count; j++) {
+            queue->pids[j - 1] = queue->pids[j];
+        }
+
+        queue->count--;
+        queue->pids[queue->count] = 0;
+
+        leaveCriticalSection(flags);
+        return 1;
+    }
+
+    leaveCriticalSection(flags);
+    return 0;
+}

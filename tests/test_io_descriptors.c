@@ -166,3 +166,32 @@ int main(void) {
     puts("OK: permisos, aislamiento y operaciones de I/O");
     return 0;
 }
+
+
+/*
+ * Stubs para el test unitario de descriptores.
+ * La integracion real se prueba por separado.
+ */
+#include <pipeIO.h>
+
+uint64_t pipeReadBlocking(
+    uint64_t pipeId,
+    uint8_t *destination,
+    uint64_t count
+) {
+    (void)pipeId;
+    (void)destination;
+    (void)count;
+    return 0;
+}
+
+uint64_t pipeWriteBlocking(
+    uint64_t pipeId,
+    const uint8_t *source,
+    uint64_t count
+) {
+    (void)pipeId;
+    (void)source;
+    (void)count;
+    return 0;
+}

@@ -1,3 +1,4 @@
+#include <pipeIO.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -167,8 +168,11 @@ uint64_t ioRead(uint64_t fd, char *buffer, uint64_t count) {
         }
 
         case IO_DESCRIPTOR_PIPE:
-            /* La lectura de pipes corresponde al bloque 18. */
-            return 0;
+            return pipeReadBlocking(
+                descriptor.resourceId,
+                (uint8_t *)buffer,
+                count
+            );
 
         default:
             return 0;
@@ -199,8 +203,11 @@ uint64_t ioWrite(uint64_t fd, const char *buffer, uint64_t count) {
             return count;
 
         case IO_DESCRIPTOR_PIPE:
-            /* La escritura de pipes corresponde al bloque 18. */
-            return 0;
+            return pipeWriteBlocking(
+                descriptor.resourceId,
+                (const uint8_t *)buffer,
+                count
+            );
 
         default:
             return 0;
