@@ -45,6 +45,12 @@ uint64_t pipeCreate(const char *name);
 uint64_t pipeOpen(const char *name);
 
 /*
+ * Elimina un pipe sin extremos abiertos ni procesos esperando.
+ * Devuelve 1 si tuvo exito y 0 si falla.
+ */
+uint8_t pipeDestroy(uint64_t pipeId);
+
+/*
  * Abre un extremo de un pipe existente.
  * mode: PIPE_READ o PIPE_WRITE.
  * Devuelve un descriptor local, o MAX_PROCESS_DESCRIPTORS si falla.

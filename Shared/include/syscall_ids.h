@@ -64,4 +64,10 @@
 #define SYS_PIPE_OPEN    33
 #define SYS_CLOSE        34
 
+/* Redireccion de descriptores de procesos hijos */
+#define SYS_PROC_REDIRECT 35
+
+/* Eliminar un pipe sin extremos abiertos ni procesos esperando */
+#define SYS_PIPE_DESTROY 36
+
 #endif

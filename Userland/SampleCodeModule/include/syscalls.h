@@ -80,6 +80,14 @@ uint64_t sysCreateProcess(
  * No retorna si tiene exito.
  * Devuelve 0 si no existe un proceso actual.
  */
+/*
+ * Crea un proceso con STDIN y STDOUT redirigidos.
+ * Retorna el PID creado o 0 si falla.
+ */
+uint64_t sysCreateProcessWithRedirectedIO(
+    const ProcessCreateIOArgs *args
+);
+
 uint64_t sysExit(void);
 
 /*
@@ -120,6 +128,13 @@ uint64_t sysYield(void);
  */
 uint64_t sysPipeCreate(const char *name);
 uint64_t sysPipeOpen(const char *name, PipeMode mode);
+
+/*
+ * Elimina un pipe por ID si no tiene extremos abiertos
+ * ni procesos esperando.
+ * Devuelve 1 si tuvo exito y 0 si falla.
+ */
+uint64_t sysPipeDestroy(uint64_t pipeId);
 
 uint64_t sysSemCreate(const char *name, uint64_t initialValue);
 uint64_t sysSemOpen(const char *name);

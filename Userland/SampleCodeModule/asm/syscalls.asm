@@ -19,6 +19,7 @@ GLOBAL sysMalloc
 GLOBAL sysFree
 GLOBAL sysMemInfo
 GLOBAL sysCreateProcess
+GLOBAL sysCreateProcessWithRedirectedIO
 GLOBAL sysExit
 GLOBAL sysKill
 GLOBAL sysWait
@@ -87,6 +88,14 @@ sysCreateProcess:
     mov rax, SYS_CREATE_PROC
     int 0x80
     ret
+
+; RDI = puntero a ProcessCreateIOArgs
+; RAX = PID creado o 0 si falla
+sysCreateProcessWithRedirectedIO:
+    mov rax, SYS_PROC_REDIRECT
+    int 0x80
+    ret
+
 
 sysPs:
     mov rax, SYS_PS
@@ -264,6 +273,16 @@ sysPipeCreate:
 ; RDI = nombre, RSI = modo
 sysPipeOpen:
     mov rax, SYS_PIPE_OPEN
+    int 0x80
+    ret
+
+global sysPipeDestroy
+
+; uint64_t sysPipeDestroy(uint64_t pipeId)
+; RDI = ID del pipe
+; RAX = 1 si tuvo exito, 0 si falla
+sysPipeDestroy:
+    mov rax, SYS_PIPE_DESTROY
     int 0x80
     ret
 

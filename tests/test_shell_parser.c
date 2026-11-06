@@ -45,7 +45,41 @@ int main(void) {
     assert(!shellParseCommand("&", &parsed));
     assert(!shellParseCommand("echo & otro", &parsed));
     assert(!shellParseCommand("echo &&", &parsed));
-    assert(!shellParseCommand("cat | wc", &parsed));
+    /* Pipeline con espacios. */
+    assert(shellParseCommand("cat | wc", &parsed));
+    assert(parsed.argc == 1);
+    assert(strcmp(parsed.argv[0], "cat") == 0);
+    assert(parsed.pipeArgc == 1);
+    assert(strcmp(parsed.pipeArgv[0], "wc") == 0);
+    assert(parsed.background == 0);
+
+    /* Pipeline sin espacios y con argumentos. */
+    assert(shellParseCommand("echo hola|echo mundo", &parsed));
+    assert(parsed.argc == 2);
+    assert(strcmp(parsed.argv[0], "echo") == 0);
+    assert(strcmp(parsed.argv[1], "hola") == 0);
+    assert(parsed.pipeArgc == 2);
+    assert(strcmp(parsed.pipeArgv[0], "echo") == 0);
+    assert(strcmp(parsed.pipeArgv[1], "mundo") == 0);
+
+    /* Pipeline en background. */
+    assert(shellParseCommand("echo hola | echo mundo &", &parsed));
+    assert(parsed.pipeArgc == 2);
+    assert(parsed.background == 1);
+
+    /* Los comandos simples no tienen segundo comando. */
+    assert(shellParseCommand("echo hola", &parsed));
+    assert(parsed.argc == 2);
+    assert(parsed.pipeArgc == 0);
+
+    /* Sintaxis invalida de pipelines. */
+    assert(!shellParseCommand("| echo", &parsed));
+    assert(!shellParseCommand("echo |", &parsed));
+    assert(!shellParseCommand("echo || echo", &parsed));
+    assert(!shellParseCommand("echo | | echo", &parsed));
+    assert(!shellParseCommand("echo | echo | echo", &parsed));
+    assert(!shellParseCommand("echo | &", &parsed));
+    assert(!shellParseCommand("echo & | echo", &parsed));
 
     /* Exceso de argumentos. */
     assert(!shellParseCommand(

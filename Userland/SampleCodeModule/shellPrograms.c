@@ -24,3 +24,35 @@ void shellEchoProcess(uint64_t argc, char **argv) {
 
     sysWrite(STDOUT, "\n", 1);
 }
+
+/*
+ * Programa cat.
+ *
+ * Copia STDIN a STDOUT hasta recibir EOF.
+ * Sirve como consumidor de datos en un pipeline.
+ */
+void shellCatProcess(uint64_t argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
+    char buffer[128];
+    uint64_t bytesRead;
+
+    while ((bytesRead = sysRead(STDIN, buffer, sizeof(buffer))) > 0) {
+        uint64_t written = 0;
+
+        while (written < bytesRead) {
+            uint64_t count = sysWrite(
+                STDOUT,
+                buffer + written,
+                bytesRead - written
+            );
+
+            if (count == 0) {
+                return;
+            }
+
+            written += count;
+        }
+    }
+}

@@ -1,4 +1,6 @@
 #include <pipeClose.h>
+#include <pipe.h>
+#include <ioDescriptor.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -204,6 +206,61 @@ static uint8_t copyProcessArguments(
  * Implementacion comun para crear procesos
  * con y sin argumentos.
  */
+/*
+ * Copia un descriptor del proceso creador al hijo.
+ * Solo se utiliza antes de registrar al nuevo proceso.
+ */
+static uint8_t inheritProcessDescriptor(
+    Process *child,
+    IODescriptor *parentTable,
+    uint64_t sourceFd,
+    uint64_t targetFd,
+    uint8_t requiredPermission
+) {
+    if (child == NULL ||
+        parentTable == NULL ||
+        sourceFd >= MAX_PROCESS_DESCRIPTORS ||
+        targetFd >= MAX_PROCESS_DESCRIPTORS) {
+        return 0;
+    }
+
+    IODescriptor descriptor;
+
+    if (!ioGetDescriptor(parentTable, sourceFd, &descriptor) ||
+        descriptor.permissions != requiredPermission) {
+        return 0;
+    }
+
+    if (descriptor.type == IO_DESCRIPTOR_KEYBOARD) {
+        if (requiredPermission != IO_ACCESS_READ) {
+            return 0;
+        }
+    } else if (descriptor.type == IO_DESCRIPTOR_TERMINAL) {
+        if (requiredPermission != IO_ACCESS_WRITE) {
+            return 0;
+        }
+    } else if (descriptor.type != IO_DESCRIPTOR_PIPE) {
+        return 0;
+    }
+
+    if (descriptor.type == IO_DESCRIPTOR_PIPE) {
+        Pipe *pipe = findPipeById(descriptor.resourceId);
+
+        if (pipe == NULL) {
+            return 0;
+        }
+
+        if (requiredPermission == IO_ACCESS_READ) {
+            pipe->readers++;
+        } else {
+            pipe->writers++;
+        }
+    }
+
+    child->ioDescriptors[targetFd] = descriptor;
+    return 1;
+}
+
 static uint64_t createProcessInternal(
     const char *name,
     void (*simpleEntry)(void),
@@ -212,7 +269,9 @@ static uint64_t createProcessInternal(
     uint64_t parentPid,
     uint8_t foreground,
     uint64_t argc,
-    const char *const argv[]
+    const char *const argv[],
+    uint64_t stdinFd,
+    uint64_t stdoutFd
 ) {
     if (name == NULL ||
         name[0] == '\0' ||
@@ -337,12 +396,42 @@ static uint64_t createProcessInternal(
 
     process->savedStackPointer = (uint64_t)savedFrame;
 
-    if (!registerProcess(process)) {
+    /*
+     * Configurar STDIN y STDOUT antes de registrar el proceso.
+     * Hasta este punto el hijo no puede ser planificado.
+     */
+    uint64_t ioFlags = saveAndDisableInterrupts();
+    IODescriptor *parentTable = ioGetCurrentDescriptorTable();
+
+    uint8_t inputReady = inheritProcessDescriptor(
+        process, parentTable, stdinFd, IO_FD_STDIN, IO_ACCESS_READ
+    );
+
+    uint8_t outputReady = 0;
+
+    if (inputReady) {
+        outputReady = inheritProcessDescriptor(
+            process, parentTable, stdoutFd, IO_FD_STDOUT, IO_ACCESS_WRITE
+        );
+    }
+
+    if (!inputReady || !outputReady) {
+        pipeCloseAllDescriptors(process->ioDescriptors);
+        restoreInterrupts(ioFlags);
         freeMemory(stack);
         freeMemory(process);
         return 0;
     }
 
+    if (!registerProcess(process)) {
+        pipeCloseAllDescriptors(process->ioDescriptors);
+        restoreInterrupts(ioFlags);
+        freeMemory(stack);
+        freeMemory(process);
+        return 0;
+    }
+
+    restoreInterrupts(ioFlags);
     return nextPid++;
 }
 
@@ -364,7 +453,9 @@ uint64_t createProcess(
         parentPid,
         foreground,
         0,
-        NULL
+        NULL,
+        IO_FD_STDIN,
+        IO_FD_STDOUT
     );
 }
 
@@ -392,7 +483,42 @@ uint64_t createProcessWithArgs(
         parentPid,
         foreground,
         argc,
-        argv
+        argv,
+        IO_FD_STDIN,
+        IO_FD_STDOUT
+    );
+}
+
+/*
+ * Crea un proceso con STDIN y STDOUT configurados
+ * antes de incorporarlo al scheduler.
+ */
+uint64_t createProcessWithRedirectedIO(
+    const char *name,
+    void (*entryPoint)(uint64_t argc, char **argv),
+    uint64_t priority,
+    uint64_t parentPid,
+    uint8_t foreground,
+    uint64_t argc,
+    const char *const argv[],
+    uint64_t stdinFd,
+    uint64_t stdoutFd
+) {
+    if (entryPoint == NULL) {
+        return 0;
+    }
+
+    return createProcessInternal(
+        name,
+        NULL,
+        entryPoint,
+        priority,
+        parentPid,
+        foreground,
+        argc,
+        argv,
+        stdinFd,
+        stdoutFd
     );
 }
 

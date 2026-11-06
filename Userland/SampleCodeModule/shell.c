@@ -11,6 +11,53 @@
 
 static uint64_t backgroundPids[SHELL_BACKGROUND_CAPACITY];
 static uint64_t backgroundCount = 0;
+
+/* Seguimiento de pipelines ejecutados en background. */
+#define SHELL_BACKGROUND_PIPELINE_CAPACITY 8
+
+typedef struct {
+    uint64_t pipeId;
+    uint64_t writerPid;
+    uint64_t readerPid;
+} ShellBackgroundPipeline;
+
+static ShellBackgroundPipeline backgroundPipelines[
+    SHELL_BACKGROUND_PIPELINE_CAPACITY
+];
+
+static uint64_t backgroundPipelineCount = 0;
+
+/* Identificador para nombres de pipes temporales. */
+static uint64_t nextShellPipeId = 1;
+
+/*
+ * Genera nombres shpipe1, shpipe2, etc.
+ * El buffer debe tener espacio para al menos 27 caracteres.
+ */
+static void makeShellPipeName(char name[32]) {
+    const char prefix[] = "shpipe";
+    uint64_t index = 0;
+
+    for (uint64_t i = 0; prefix[i] != '\0'; i++) {
+        name[index++] = prefix[i];
+    }
+
+    uint64_t value = nextShellPipeId++;
+    char digits[20];
+    uint64_t count = 0;
+
+    do {
+        digits[count++] = '0' + (value % 10);
+        value /= 10;
+    } while (value != 0);
+
+    while (count > 0) {
+        name[index++] = digits[--count];
+    }
+
+    name[index] = '\0';
+}
+
 static ProcessInfo backgroundSnapshot[SHELL_SNAPSHOT_CAPACITY];
 
 #define TSC_FREQUENCY_HZ 2500000000ULL
@@ -256,6 +303,50 @@ static void printApproxSeconds(uint64_t cycles) {
  *
  * Nunca espera a un hijo que todavia esta ejecutandose.
  */
+/*
+ * Marca un proceso de pipeline como finalizado.
+ * Un PID igual a cero indica que ya fue liberado.
+ */
+static void shellMarkPipelineChildFinished(uint64_t pid) {
+    for (uint64_t i = 0; i < backgroundPipelineCount; i++) {
+        ShellBackgroundPipeline *pipeline = &backgroundPipelines[i];
+
+        if (pipeline->writerPid == pid) {
+            pipeline->writerPid = 0;
+        }
+
+        if (pipeline->readerPid == pid) {
+            pipeline->readerPid = 0;
+        }
+    }
+}
+
+/*
+ * Libera los pipes cuyos dos procesos ya finalizaron.
+ */
+static void shellCleanupBackgroundPipelines(void) {
+    uint64_t i = 0;
+
+    while (i < backgroundPipelineCount) {
+        ShellBackgroundPipeline *pipeline = &backgroundPipelines[i];
+
+        if (pipeline->writerPid != 0 || pipeline->readerPid != 0) {
+            i++;
+            continue;
+        }
+
+        if (!sysPipeDestroy(pipeline->pipeId)) {
+            print("ERROR: no se pudo liberar el pipe de background\n");
+            i++;
+            continue;
+        }
+
+        backgroundPipelineCount--;
+        backgroundPipelines[i] =
+            backgroundPipelines[backgroundPipelineCount];
+    }
+}
+
 static void shellReapBackgroundChildren(void) {
     if (backgroundCount == 0) {
         return;
@@ -299,6 +390,9 @@ static void shellReapBackgroundChildren(void) {
         }
 
         if (reaped || !found) {
+            if (reaped) {
+                shellMarkPipelineChildFinished(pid);
+            }
             backgroundCount--;
             backgroundPids[i] =
                 backgroundPids[backgroundCount];
@@ -307,6 +401,8 @@ static void shellReapBackgroundChildren(void) {
 
         i++;
     }
+
+    shellCleanupBackgroundPipelines();
 }
 
 static void printHelp(void) {
@@ -348,7 +444,150 @@ static ShellProgramEntry findShellProgram(const char *name) {
         return shellEchoProcess;
     }
 
+    if (stringsEqual(name, "cat")) {
+        return shellCatProcess;
+    }
+
     return 0;
+}
+
+/*
+ * Ejecuta dos programas conectados por un pipe.
+ *
+ * El primer proceso escribe en el pipe.
+ * El segundo lee del pipe.
+ */
+static void executePipeline(const ShellParsedCommand *parsed) {
+    if (parsed->background &&
+        (backgroundCount > SHELL_BACKGROUND_CAPACITY - 2 ||
+         backgroundPipelineCount >=
+             SHELL_BACKGROUND_PIPELINE_CAPACITY)) {
+        print("ERROR: demasiados procesos en background\n");
+        return;
+    }
+
+    ShellProgramEntry left = findShellProgram(parsed->argv[0]);
+    ShellProgramEntry right = findShellProgram(parsed->pipeArgv[0]);
+
+    if (left == 0 || right == 0) {
+        print("ERROR: programa desconocido en pipeline\n");
+        return;
+    }
+
+    char pipeName[32];
+    makeShellPipeName(pipeName);
+
+    uint64_t pipeId = sysPipeCreate(pipeName);
+
+    if (pipeId == 0) {
+        print("ERROR: no se pudo crear el pipe\n");
+        return;
+    }
+
+    uint64_t readFd = sysPipeOpen(pipeName, PIPE_READ);
+    uint64_t writeFd = sysPipeOpen(pipeName, PIPE_WRITE);
+
+    if (readFd >= 16 || writeFd >= 16) {
+        print("ERROR: no se pudieron abrir los extremos\n");
+
+        if (readFd < 16) {
+            sysClose(readFd);
+        }
+
+        if (writeFd < 16) {
+            sysClose(writeFd);
+        }
+
+        sysPipeDestroy(pipeId);
+        return;
+    }
+
+    ProcessCreateIOArgs writerArgs = {
+        .name = parsed->argv[0],
+        .entryPoint = left,
+        .priority = 1,
+        .foreground = parsed->background ? 0 : 1,
+        .argc = parsed->argc,
+        .argv = (const char *const *)parsed->argv,
+        .stdinFd = STDIN,
+        .stdoutFd = writeFd
+    };
+
+    ProcessCreateIOArgs readerArgs = {
+        .name = parsed->pipeArgv[0],
+        .entryPoint = right,
+        .priority = 1,
+        .foreground = parsed->background ? 0 : 1,
+        .argc = parsed->pipeArgc,
+        .argv = (const char *const *)parsed->pipeArgv,
+        .stdinFd = readFd,
+        .stdoutFd = STDOUT
+    };
+
+    /*
+     * Crear ambos hijos antes de esperar.
+     * El lector debe existir para consumir los datos.
+     */
+    uint64_t writerPid =
+        sysCreateProcessWithRedirectedIO(&writerArgs);
+
+    uint64_t readerPid = 0;
+
+    if (writerPid != 0) {
+        readerPid = sysCreateProcessWithRedirectedIO(&readerArgs);
+    }
+
+    /*
+     * Si falla la creacion del lector, terminar el escritor
+     * antes de cerrar los extremos originales.
+     */
+    if (writerPid != 0 && readerPid == 0) {
+        sysKill(writerPid);
+    }
+
+    /*
+     * Los hijos ya heredaron sus descriptores.
+     * La shell debe liberar los suyos para permitir EOF.
+     */
+    sysClose(writeFd);
+    sysClose(readFd);
+
+    if (parsed->background &&
+        writerPid != 0 && readerPid != 0) {
+
+        backgroundPipelines[backgroundPipelineCount++] =
+            (ShellBackgroundPipeline){
+                .pipeId = pipeId,
+                .writerPid = writerPid,
+                .readerPid = readerPid
+            };
+
+        backgroundPids[backgroundCount++] = writerPid;
+        backgroundPids[backgroundCount++] = readerPid;
+
+        print("[bg] pipeline iniciado PID ");
+        printDecimal(writerPid);
+        print(" y PID ");
+        printDecimal(readerPid);
+        print("\n");
+        return;
+    }
+
+    if (writerPid != 0) {
+        sysWait(writerPid);
+    }
+
+    if (readerPid != 0) {
+        sysWait(readerPid);
+    }
+
+    if (!sysPipeDestroy(pipeId)) {
+        print("ERROR: no se pudo liberar el pipe\n");
+    }
+
+    if (writerPid == 0 || readerPid == 0) {
+        print("ERROR: no se pudo crear el pipeline\n");
+    }
 }
 
 static void executeCommand(const char *command) {
@@ -361,6 +600,15 @@ static void executeCommand(const char *command) {
     }
 
     if (parsed.argc == 0) {
+        return;
+    }
+
+    /*
+     * Si hay un segundo comando, ejecutar ambos
+     * conectados por un pipe.
+     */
+    if (parsed.pipeArgc > 0) {
+        executePipeline(&parsed);
         return;
     }
 
@@ -460,7 +708,7 @@ static void executeCommand(const char *command) {
     if (stringsEqual(command, "regs")) {
 
         clearScreen();
-        
+
         RegisterFrame registers;
 
         if (!sysGetRegisters(&registers)) {

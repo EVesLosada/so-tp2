@@ -20,6 +20,81 @@ static void testCreation(void) {
     printf("OK: creacion y apertura de pipes\n");
 }
 
+static void testDestroy(void) {
+    initializePipeTable();
+
+    assert(pipeDestroy(0) == 0);
+    assert(pipeDestroy(9999) == 0);
+
+    uint64_t id = pipeCreate("destroy-test");
+    assert(id != 0);
+
+    assert(pipeDestroy(id) == 1);
+    assert(findPipeById(id) == NULL);
+    assert(pipeOpen("destroy-test") == 0);
+    assert(pipeDestroy(id) == 0);
+
+    uint64_t newId = pipeCreate("destroy-test");
+    assert(newId != 0);
+    assert(newId != id);
+
+    initializePipeTable();
+
+    for (uint64_t i = 0; i < MAX_PIPES; i++) {
+        char name[PIPE_NAME_MAX_LENGTH];
+        snprintf(
+            name,
+            sizeof(name),
+            "destroy-%llu",
+            (unsigned long long)i
+        );
+        assert(pipeCreate(name) != 0);
+    }
+
+    assert(pipeCreate("extra-pipe") == 0);
+
+    uint64_t firstId = pipeOpen("destroy-0");
+    assert(firstId != 0);
+    assert(pipeDestroy(firstId) == 1);
+
+    assert(pipeCreate("extra-pipe") != 0);
+
+    puts("OK: eliminacion y reutilizacion de pipes");
+}
+
+static void testDestroyBusyPipe(void) {
+    initializePipeTable();
+
+    uint64_t id = pipeCreate("busy-pipe");
+    assert(id != 0);
+
+    Pipe *pipe = findPipeById(id);
+    assert(pipe != NULL);
+
+    pipe->readers = 1;
+    assert(pipeDestroy(id) == 0);
+    assert(findPipeById(id) == pipe);
+    pipe->readers = 0;
+
+    pipe->writers = 1;
+    assert(pipeDestroy(id) == 0);
+    assert(findPipeById(id) == pipe);
+    pipe->writers = 0;
+
+    pipe->readerWaiters.count = 1;
+    assert(pipeDestroy(id) == 0);
+    pipe->readerWaiters.count = 0;
+
+    pipe->writerWaiters.count = 1;
+    assert(pipeDestroy(id) == 0);
+    pipe->writerWaiters.count = 0;
+
+    assert(pipeDestroy(id) == 1);
+    assert(findPipeById(id) == NULL);
+
+    puts("OK: no se destruyen pipes en uso");
+}
+
 static void testBuffer(void) {
     initializePipeTable();
 
@@ -165,6 +240,8 @@ static void testCircularWraparound(void) {
 }
 
 int main(void) {
+    testDestroyBusyPipe();
+    testDestroy();
     testCircularWraparound();
     testCreation();
     testBuffer();

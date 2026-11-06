@@ -50,4 +50,19 @@ typedef enum {
     PIPE_WRITE = 1
 } PipeMode;
 
+/*
+ * Parametros para crear un proceso con STDIN y STDOUT
+ * configurados antes de incorporarlo al scheduler.
+ */
+typedef struct {
+    const char *name;
+    void (*entryPoint)(uint64_t argc, char **argv);
+    uint64_t priority;
+    uint8_t foreground;
+    uint64_t argc;
+    const char *const *argv;
+    uint64_t stdinFd;
+    uint64_t stdoutFd;
+} ProcessCreateIOArgs;
+
 #endif

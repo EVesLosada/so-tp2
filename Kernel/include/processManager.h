@@ -42,6 +42,25 @@ uint64_t createProcessWithArgs(
 );
 
 /*
+ * Crea un proceso con argumentos y descriptores de entrada/salida
+ * seleccionados del proceso padre.
+ *
+ * Los descriptores se configuran antes de registrar al hijo.
+ * Retorna el PID creado o 0 si falla.
+ */
+uint64_t createProcessWithRedirectedIO(
+    const char *name,
+    void (*entryPoint)(uint64_t argc, char **argv),
+    uint64_t priority,
+    uint64_t parentPid,
+    uint8_t foreground,
+    uint64_t argc,
+    const char *const argv[],
+    uint64_t stdinFd,
+    uint64_t stdoutFd
+);
+
+/*
  * Busca el siguiente proceso listo para ejecutar.
  *
  * Recorre la tabla de forma circular.

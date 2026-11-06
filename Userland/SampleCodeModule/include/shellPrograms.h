@@ -4,5 +4,6 @@
 #include <stdint.h>
 
 void shellEchoProcess(uint64_t argc, char **argv);
+void shellCatProcess(uint64_t argc, char **argv);
 
 #endif

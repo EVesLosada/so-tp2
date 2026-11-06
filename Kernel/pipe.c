@@ -105,6 +105,30 @@ uint64_t pipeOpen(const char *name) {
 }
 
 
+uint8_t pipeDestroy(uint64_t pipeId) {
+    if (pipeId == 0) {
+        return 0;
+    }
+
+    uint64_t flags = enterCriticalSection();
+
+    Pipe *pipe = findPipeById(pipeId);
+
+    if (pipe == NULL ||
+        pipe->readers != 0 ||
+        pipe->writers != 0 ||
+        pipe->readerWaiters.count != 0 ||
+        pipe->writerWaiters.count != 0) {
+        leaveCriticalSection(flags);
+        return 0;
+    }
+
+    *pipe = (Pipe){0};
+
+    leaveCriticalSection(flags);
+    return 1;
+}
+
 void initializePipeTable(void) {
     uint64_t flags = enterCriticalSection();
 

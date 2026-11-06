@@ -16,7 +16,6 @@ uint8_t shellParseCommand(
     *result = (ShellParsedCommand){0};
 
     uint64_t length = 0;
-
     while (length < SHELL_MAX_LINE_LENGTH &&
            line[length] != '\0') {
         result->buffer[length] = line[length];
@@ -30,6 +29,7 @@ uint8_t shellParseCommand(
     result->buffer[length] = '\0';
 
     char *cursor = result->buffer;
+    uint8_t afterPipe = 0;
 
     while (1) {
         while (isSpace(*cursor)) {
@@ -37,20 +37,27 @@ uint8_t shellParseCommand(
         }
 
         if (*cursor == '\0') {
-            return 1;
+            return !afterPipe || result->pipeArgc > 0;
         }
 
-        /*
-         * '&' solo puede aparecer al final
-         * y despues de al menos un comando.
-         */
+        if (*cursor == '|') {
+            if (afterPipe || result->argc == 0) {
+                return 0;
+            }
+
+            afterPipe = 1;
+            cursor++;
+            continue;
+        }
+
         if (*cursor == '&') {
-            if (result->argc == 0) {
+            if (afterPipe
+                    ? result->pipeArgc == 0
+                    : result->argc == 0) {
                 return 0;
             }
 
             cursor++;
-
             while (isSpace(*cursor)) {
                 cursor++;
             }
@@ -63,23 +70,24 @@ uint8_t shellParseCommand(
             return 1;
         }
 
-        if (result->argc >= SHELL_MAX_ARGUMENTS) {
+        uint64_t *argc = afterPipe
+            ? &result->pipeArgc
+            : &result->argc;
+
+        char **argv = afterPipe
+            ? result->pipeArgv
+            : result->argv;
+
+        if (*argc >= SHELL_MAX_ARGUMENTS) {
             return 0;
         }
 
-        result->argv[result->argc++] = cursor;
+        argv[(*argc)++] = cursor;
 
         while (*cursor != '\0' &&
                !isSpace(*cursor) &&
-               *cursor != '&') {
-            /*
-             * Los pipes se implementaran
-             * en el bloque siguiente.
-             */
-            if (*cursor == '|') {
-                return 0;
-            }
-
+               *cursor != '&' &&
+               *cursor != '|') {
             cursor++;
         }
 
@@ -87,10 +95,16 @@ uint8_t shellParseCommand(
             return 1;
         }
 
-        if (*cursor == '&') {
-            *cursor = '\0';
-            cursor++;
+        char separator = *cursor;
+        *cursor = '\0';
+        cursor++;
 
+        if (separator == '|') {
+            if (afterPipe) {
+                return 0;
+            }
+            afterPipe = 1;
+        } else if (separator == '&') {
             while (isSpace(*cursor)) {
                 cursor++;
             }
@@ -102,8 +116,5 @@ uint8_t shellParseCommand(
             result->background = 1;
             return 1;
         }
-
-        *cursor = '\0';
-        cursor++;
     }
 }

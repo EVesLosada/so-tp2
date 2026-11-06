@@ -122,6 +122,15 @@ void keyboardProcessScancode(uint8_t scancode, RegisterFrame *frame) {
         return;
     }
 
+    /*
+     * F6 = operador de pipeline.
+     * Atajo para teclados donde escribir | resulta dificil.
+     */
+    if (scancode == 0x40) {
+        enqueueCharacter('|');
+        return;
+    }
+
     if (scancode >= KEY_MAP_SIZE) {
         return;
     }

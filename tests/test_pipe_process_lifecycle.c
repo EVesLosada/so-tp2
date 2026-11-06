@@ -11,6 +11,7 @@
 #include <ioDescriptor.h>
 #include <pipe.h>
 #include <pipeIO.h>
+#include <pipeClose.h>
 
 /*
  * Usamos los modulos reales del kernel.
@@ -368,7 +369,162 @@ static void testNormalExitClosesPipes(void) {
     puts("OK: ambos procesos liberados despues del scheduler");
 }
 
+static void dummyEntryWithArgs(uint64_t argc, char **argv) {
+    (void)argc;
+    (void)argv;
+}
+
+static void testRedirectedProcessInheritance(void) {
+    initializeProcessManager();
+    initializePipeTable();
+
+    uint64_t pipeId = pipeCreate("redirect-inherit");
+    assert(pipeId != 0);
+
+    Pipe *pipe = findPipeById(pipeId);
+    assert(pipe != NULL);
+
+    uint64_t readFd =
+        pipeOpenDescriptor("redirect-inherit", PIPE_READ);
+    uint64_t writeFd =
+        pipeOpenDescriptor("redirect-inherit", PIPE_WRITE);
+
+    assert(readFd < MAX_PROCESS_DESCRIPTORS);
+    assert(writeFd < MAX_PROCESS_DESCRIPTORS);
+
+    assert(pipe->readers == 1);
+    assert(pipe->writers == 1);
+
+    uint64_t readerPid = createProcessWithRedirectedIO(
+        "redirect-reader",
+        dummyEntryWithArgs,
+        1, 0, 0, 0, NULL,
+        readFd, IO_FD_STDOUT
+    );
+
+    assert(readerPid != 0);
+    assert(pipe->readers == 2);
+    assert(pipe->writers == 1);
+
+    Process *reader = findProcessByPid(readerPid);
+    assert(reader != NULL);
+    assert(reader->ioDescriptors[IO_FD_STDIN].inUse);
+    assert(reader->ioDescriptors[IO_FD_STDIN].type ==
+           IO_DESCRIPTOR_PIPE);
+    assert(reader->ioDescriptors[IO_FD_STDIN].resourceId ==
+           pipeId);
+
+    uint64_t writerPid = createProcessWithRedirectedIO(
+        "redirect-writer",
+        dummyEntryWithArgs,
+        1, 0, 0, 0, NULL,
+        IO_FD_STDIN, writeFd
+    );
+
+    assert(writerPid != 0);
+    assert(pipe->readers == 2);
+    assert(pipe->writers == 2);
+
+    Process *writer = findProcessByPid(writerPid);
+    assert(writer != NULL);
+    assert(writer->ioDescriptors[IO_FD_STDOUT].inUse);
+    assert(writer->ioDescriptors[IO_FD_STDOUT].type ==
+           IO_DESCRIPTOR_PIPE);
+    assert(writer->ioDescriptors[IO_FD_STDOUT].resourceId ==
+           pipeId);
+
+    assert(terminateProcess(readerPid) == 1);
+    assert(pipe->readers == 1);
+    assert(pipe->writers == 2);
+
+    assert(terminateProcess(writerPid) == 1);
+    assert(pipe->readers == 1);
+    assert(pipe->writers == 1);
+
+    assert(reapTerminatedProcesses() == 2);
+
+    IODescriptor *shellTable = ioGetCurrentDescriptorTable();
+    assert(shellTable != NULL);
+
+    assert(pipeCloseDescriptor(shellTable, readFd) == 1);
+    assert(pipeCloseDescriptor(shellTable, writeFd) == 1);
+
+    assert(pipe->readers == 0);
+    assert(pipe->writers == 0);
+    assert(pipeDestroy(pipeId) == 1);
+
+    puts("OK: herencia y liberacion de STDIN/STDOUT redirigidos");
+}
+
+static void testInvalidRedirectedDescriptors(void) {
+    initializeProcessManager();
+    initializePipeTable();
+
+    uint64_t pipeId = pipeCreate("redirect-invalid");
+    assert(pipeId != 0);
+
+    Pipe *pipe = findPipeById(pipeId);
+    assert(pipe != NULL);
+
+    uint64_t readFd =
+        pipeOpenDescriptor("redirect-invalid", PIPE_READ);
+    uint64_t writeFd =
+        pipeOpenDescriptor("redirect-invalid", PIPE_WRITE);
+
+    assert(readFd < MAX_PROCESS_DESCRIPTORS);
+    assert(writeFd < MAX_PROCESS_DESCRIPTORS);
+
+    assert(pipe->readers == 1);
+    assert(pipe->writers == 1);
+
+    /* STDIN no puede recibir un extremo de escritura. */
+    assert(createProcessWithRedirectedIO(
+        "invalid-input", dummyEntryWithArgs,
+        1, 0, 0, 0, NULL,
+        writeFd, IO_FD_STDOUT
+    ) == 0);
+
+    /* STDOUT no puede recibir un extremo de lectura. */
+    assert(createProcessWithRedirectedIO(
+        "invalid-output", dummyEntryWithArgs,
+        1, 0, 0, 0, NULL,
+        IO_FD_STDIN, readFd
+    ) == 0);
+
+    /* El descriptor debe existir en la tabla del padre. */
+    assert(createProcessWithRedirectedIO(
+        "missing-input", dummyEntryWithArgs,
+        1, 0, 0, 0, NULL,
+        MAX_PROCESS_DESCRIPTORS, IO_FD_STDOUT
+    ) == 0);
+
+    /* Si falla STDOUT, debe revertirse la herencia de STDIN. */
+    assert(createProcessWithRedirectedIO(
+        "rollback-input", dummyEntryWithArgs,
+        1, 0, 0, 0, NULL,
+        readFd, MAX_PROCESS_DESCRIPTORS
+    ) == 0);
+
+    assert(getProcessCount() == 0);
+    assert(pipe->readers == 1);
+    assert(pipe->writers == 1);
+
+    IODescriptor *shellTable = ioGetCurrentDescriptorTable();
+    assert(shellTable != NULL);
+
+    assert(pipeCloseDescriptor(shellTable, readFd) == 1);
+    assert(pipeCloseDescriptor(shellTable, writeFd) == 1);
+
+    assert(pipe->readers == 0);
+    assert(pipe->writers == 0);
+    assert(pipeDestroy(pipeId) == 1);
+
+    puts("OK: redirecciones invalidas sin fugas de referencias");
+}
+
 int main(void) {
+    testInvalidRedirectedDescriptors();
+    testRedirectedProcessInheritance();
     testKillLastWriter();
     testKillLastReader();
     testKillWaitingProcess();

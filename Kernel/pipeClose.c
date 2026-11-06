@@ -6,7 +6,6 @@
 
 uint8_t pipeCloseDescriptor(IODescriptor *table, uint64_t fd) {
     if (table == NULL ||
-        fd < 2 ||
         fd >= MAX_PROCESS_DESCRIPTORS) {
         return 0;
     }
@@ -86,7 +85,7 @@ void pipeCloseAllDescriptors(IODescriptor *table) {
         return;
     }
 
-    for (uint64_t fd = 2; fd < MAX_PROCESS_DESCRIPTORS; fd++) {
+    for (uint64_t fd = 0; fd < MAX_PROCESS_DESCRIPTORS; fd++) {
         pipeCloseDescriptor(table, fd);
     }
 }

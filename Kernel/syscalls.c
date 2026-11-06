@@ -1,4 +1,5 @@
 #include <pipeClose.h>
+#include <syscall_types.h>
 #include <semaphore.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -323,6 +324,36 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
          * Obtener el PID del proceso actual.
          * La shell todavia no tiene PCB y devuelve 0.
          */
+        /*
+         * Crear un proceso con STDIN y STDOUT redirigidos.
+         *
+         * RDI = puntero a ProcessCreateIOArgs
+         * RAX = PID creado o 0 si falla.
+         */
+        case SYS_PROC_REDIRECT: {
+            const ProcessCreateIOArgs *args =
+                (const ProcessCreateIOArgs *)(uintptr_t)frame->rdi;
+
+            if (args == NULL || args->foreground > 1) {
+                return 0;
+            }
+
+            Process *parent = getCurrentProcess();
+            uint64_t parentPid = parent != NULL ? parent->pid : 0;
+
+            return createProcessWithRedirectedIO(
+                args->name,
+                args->entryPoint,
+                args->priority,
+                parentPid,
+                args->foreground,
+                args->argc,
+                args->argv,
+                args->stdinFd,
+                args->stdoutFd
+            );
+        }
+
         case SYS_GET_PID: {
             Process *current = getCurrentProcess();
             return current != NULL ? current->pid : 0;
@@ -387,6 +418,14 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
          */
         case SYS_CLOSE:
             return pipeCloseCurrentDescriptor(frame->rdi);
+
+        /*
+         * Eliminar un pipe sin extremos abiertos ni procesos esperando.
+         * RDI = ID del pipe.
+         * RAX = 1 si tuvo exito, 0 si falla.
+         */
+        case SYS_PIPE_DESTROY:
+            return pipeDestroy(frame->rdi);
 
         case SYS_PIPE_OPEN:
             return pipeOpenDescriptor(
