@@ -175,3 +175,20 @@ run_test test_shell_parser \
     tests/test_shell_parser.c \
     Userland/SampleCodeModule/shellParser.c \
     -IUserland/SampleCodeModule/include
+
+(
+    # Usar primero los headers de Userland para este test.
+    CFLAGS=(
+        -std=c99
+        -Wall
+        -Wextra
+        -Werror
+        -IUserland/SampleCodeModule/include
+        -IKernel/include
+        -IShared/include
+    )
+
+    run_test test_shell_programs \
+        tests/test_shell_programs.c \
+        Userland/SampleCodeModule/shellPrograms.c
+)

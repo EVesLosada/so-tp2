@@ -201,7 +201,13 @@ static uint8_t parseUnsignedDecimal(const char *str, uint64_t *value) {
     str = skipSpaces(str);
 
     while (*str >= '0' && *str <= '9') {
-        result = result * 10 + (*str - '0');
+        uint64_t digit = (uint64_t)(*str - '0');
+
+        if (result > (UINT64_MAX - digit) / 10) {
+            return 0;
+        }
+
+        result = result * 10 + digit;
         str++;
         hasDigits = 1;
     }
@@ -423,6 +429,13 @@ static void printHelp(void) {
     print("  gethash   - mostrar hash\n");
     print("  crack     - buscar password\n");
     print("  echo      - imprimir argumentos\n");
+    print("  mem       - mostrar estado de memoria\n");
+    print("  ps        - listar procesos\n");
+    print("  loop      - proceso repetitivo\n");
+    print("  kill PID  - terminar proceso\n");
+    print("  nice P N  - cambiar prioridad (1-5)\n");
+    print("  block PID - bloquear proceso\n");
+    print("  unblock P - desbloquear proceso\n");
     print("  jobs      - procesos en background\n");
 }
 
@@ -446,6 +459,18 @@ static ShellProgramEntry findShellProgram(const char *name) {
 
     if (stringsEqual(name, "cat")) {
         return shellCatProcess;
+    }
+
+    if (stringsEqual(name, "mem")) {
+        return shellMemProcess;
+    }
+
+    if (stringsEqual(name, "ps")) {
+        return shellPsProcess;
+    }
+
+    if (stringsEqual(name, "loop")) {
+        return shellLoopProcess;
     }
 
     return 0;
@@ -660,6 +685,110 @@ static void executeCommand(const char *command) {
 
     if (parsed.background) {
         print("Ese comando no admite background\n");
+        return;
+    }
+
+    if (stringsEqual(parsed.argv[0], "block")) {
+        uint64_t pid = 0;
+
+        if (parsed.argc != 2 ||
+            !parseUnsignedDecimal(parsed.argv[1], &pid) ||
+            pid == 0) {
+            print("Uso: block PID\n");
+            return;
+        }
+
+        /* Evitar bloquear la shell. */
+        if (pid == 1 || pid == sysGetPid()) {
+            print("ERROR: no se puede bloquear la shell\n");
+            return;
+        }
+
+        if (!sysBlock(pid)) {
+            print("ERROR: no se pudo bloquear el proceso\n");
+            return;
+        }
+
+        print("Proceso bloqueado: PID ");
+        printDecimal(pid);
+        print("\n");
+        return;
+    }
+
+    if (stringsEqual(parsed.argv[0], "unblock")) {
+        uint64_t pid = 0;
+
+        if (parsed.argc != 2 ||
+            !parseUnsignedDecimal(parsed.argv[1], &pid) ||
+            pid == 0) {
+            print("Uso: unblock PID\n");
+            return;
+        }
+
+        if (!sysUnblock(pid)) {
+            print("ERROR: no se pudo desbloquear el proceso\n");
+            return;
+        }
+
+        print("Proceso desbloqueado: PID ");
+        printDecimal(pid);
+        print("\n");
+        return;
+    }
+
+    if (stringsEqual(parsed.argv[0], "nice")) {
+        uint64_t pid = 0;
+        uint64_t priority = 0;
+
+        if (parsed.argc != 3 ||
+            !parseUnsignedDecimal(parsed.argv[1], &pid) ||
+            !parseUnsignedDecimal(parsed.argv[2], &priority) ||
+            pid == 0 ||
+            priority < 1 ||
+            priority > 5) {
+            print("Uso: nice PID PRIORIDAD (1-5)\n");
+            return;
+        }
+
+        if (!sysNice(pid, priority)) {
+            print("ERROR: no se pudo cambiar la prioridad\n");
+            return;
+        }
+
+        print("Prioridad actualizada - PID ");
+        printDecimal(pid);
+        print(" - Prioridad ");
+        printDecimal(priority);
+        print("\n");
+        return;
+    }
+
+    if (stringsEqual(parsed.argv[0], "kill")) {
+        uint64_t pid = 0;
+
+        if (parsed.argc != 2 ||
+            !parseUnsignedDecimal(parsed.argv[1], &pid) ||
+            pid == 0) {
+            print("Uso: kill PID\n");
+            return;
+        }
+
+        /* Evitar terminar la propia shell. */
+        if (pid == 1 || pid == sysGetPid()) {
+            print("ERROR: no se puede terminar la shell\n");
+            return;
+        }
+
+        if (!sysKill(pid)) {
+            print("ERROR: no se pudo terminar el proceso\n");
+            return;
+        }
+
+        print("Proceso terminado: PID ");
+        printDecimal(pid);
+        print("\n");
+
+        shellReapBackgroundChildren();
         return;
     }
 
