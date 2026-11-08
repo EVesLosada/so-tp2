@@ -1,6 +1,10 @@
 #include <stdint.h>
 #include <keyboard.h>
 #include <registers.h>
+#include <processManager.h>
+#include <processTable.h>
+#include <pipeClose.h>
+#include <semaphore.h>
 
 #define KEYBOARD_BUFFER_SIZE 128
 
@@ -15,9 +19,11 @@ static volatile char keyboardBuffer[KEYBOARD_BUFFER_SIZE];
 /* Estado de ambas teclas Shift. */
 static uint8_t leftShiftPressed = 0;
 static uint8_t rightShiftPressed = 0;
+static uint8_t controlPressed = 0;
 
 static volatile uint64_t readPosition = 0;
 static volatile uint64_t writePosition = 0;
+static volatile uint64_t waitingKeyboardPid = 0;
 
 /*
  * Tabla para scancode set 1.
@@ -85,6 +91,48 @@ static void enqueueCharacter(char character) {
 
     keyboardBuffer[writePosition] = character;
     writePosition = nextPosition;
+
+    if (waitingKeyboardPid != 0 &&
+        unblockProcess(waitingKeyboardPid)) {
+        waitingKeyboardPid = 0;
+    }
+}
+
+static void stopForegroundProcesses(void) {
+    /*
+     * La shell es un proceso foreground con parentPid == 0.
+     * Ctrl+C debe terminar a sus hijos, nunca a la shell.
+     *
+     * La limpieza de recursos se realiza fuera de IRQ1.
+     */
+    for (uint64_t i = 0; i < MAX_PROCESSES; i++) {
+        Process *process = getProcessAt(i);
+
+        if (process == 0 ||
+            !process->foreground ||
+            process->parentPid == 0 ||
+            process->state == PROCESS_TERMINATED) {
+            continue;
+        }
+
+        process->state = PROCESS_TERMINATED;
+
+        /*
+         * Si el padre esperaba a este hijo mediante sysWait,
+         * despertarlo para que pueda recogerlo y continuar.
+         */
+        Process *parent = findProcessByPid(process->parentPid);
+
+        if (parent != 0 &&
+            parent->state == PROCESS_BLOCKED &&
+            parent->waitingForChildPid == process->pid) {
+            parent->state = PROCESS_READY;
+        }
+    }
+}
+
+void keyboardSetWaitingProcess(uint64_t pid) {
+    waitingKeyboardPid = pid;
 }
 
 void keyboardProcessScancode(uint8_t scancode, RegisterFrame *frame) {
@@ -99,6 +147,29 @@ void keyboardProcessScancode(uint8_t scancode, RegisterFrame *frame) {
      * En set 1, los codigos de liberacion tienen el bit alto en 1.
      * Solo almacenamos presiones de tecla.
      */
+    if (scancode == 0x1D) {
+        controlPressed = 1;
+        return;
+    }
+    if (scancode == 0x9D) {
+        controlPressed = 0;
+        return;
+    }
+    if (controlPressed && scancode == 0x19) {
+        enqueueCharacter('|');
+        return;
+    }
+
+    if (controlPressed && scancode == 0x20) {
+        enqueueCharacter(4);
+        return;
+    }
+
+    if (controlPressed && scancode == 0x2E) {
+        stopForegroundProcesses();
+        return;
+    }
+
     if (scancode == 0x2A) {
         leftShiftPressed = 1;
         return;
@@ -156,5 +227,5 @@ uint8_t keyboardReadChar(char *character) {
     *character = keyboardBuffer[readPosition];
     readPosition = (readPosition + 1) % KEYBOARD_BUFFER_SIZE;
 
-    return 1;
+    return *character == 4 ? 2 : 1;
 }

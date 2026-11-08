@@ -429,6 +429,8 @@ static void printHelp(void) {
     print("  gethash   - mostrar hash\n");
     print("  crack     - buscar password\n");
     print("  echo      - imprimir argumentos\n");
+    print("  wc        - contar lineas de STDIN\n");
+    print("  filter    - eliminar vocales de STDIN\n");
     print("  mem       - mostrar estado de memoria\n");
     print("  test_mm N - probar memoria (maximo N bytes)\n");
     print("  ps        - listar procesos\n");
@@ -456,6 +458,14 @@ typedef void (*ShellProgramEntry)(uint64_t argc, char **argv);
 static ShellProgramEntry findShellProgram(const char *name) {
     if (stringsEqual(name, "echo")) {
         return shellEchoProcess;
+    }
+
+    if (stringsEqual(name, "filter")) {
+        return shellFilterProcess;
+    }
+
+    if (stringsEqual(name, "wc")) {
+        return shellWcProcess;
     }
 
     if (stringsEqual(name, "cat")) {
@@ -604,11 +614,15 @@ static void executePipeline(const ShellParsedCommand *parsed) {
     }
 
     if (writerPid != 0) {
-        sysWait(writerPid);
+        while (sysWait(writerPid) == 0) {
+            sysYield();
+        }
     }
 
     if (readerPid != 0) {
-        sysWait(readerPid);
+        while (sysWait(readerPid) == 0) {
+            sysYield();
+        }
     }
 
     if (!sysPipeDestroy(pipeId)) {
@@ -679,7 +693,12 @@ static void executeCommand(const char *command) {
         printDecimal(pid);
         print("\n");
 
-        if (sysWait(pid) == pid) {
+        uint64_t finished;
+        while ((finished = sysWait(pid)) == 0) {
+            sysYield();
+        }
+
+        if (finished == pid) {
             print("Shell: hijo finalizado correctamente\n");
         } else {
             print("ERROR: sysWait fallo\n");

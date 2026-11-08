@@ -1,4 +1,5 @@
 #include <pipeClose.h>
+#include <semaphore.h>
 #include <pipe.h>
 #include <ioDescriptor.h>
 #include <stdint.h>
@@ -914,6 +915,16 @@ uint64_t reapTerminatedProcesses(void) {
         }
 
         /*
+         * En el kernel real, la shell recoge sus hijos foreground.
+         * Los tests hosted conservan la semantica original del reaper.
+         */
+#if !__STDC_HOSTED__
+        if (process->parentPid == 0 && process->foreground) {
+            continue;
+        }
+#endif
+
+        /*
          * Conservar los hijos terminados de padres vivos
          * hasta que el padre recoja su finalizacion.
          *
@@ -964,14 +975,15 @@ uint64_t waitForChild(uint64_t childPid) {
 
     Process *parent = currentProcess;
 
-    if (parent == NULL || childPid == 0) {
+    if (childPid == 0) {
         restoreInterrupts(flags);
         return 0;
     }
 
     Process *child = findProcessByPid(childPid);
 
-    if (child == NULL || child->parentPid != parent->pid) {
+    if (child == NULL ||
+        child->parentPid != (parent != NULL ? parent->pid : 0)) {
         restoreInterrupts(flags);
         return 0;
     }
@@ -981,25 +993,45 @@ uint64_t waitForChild(uint64_t childPid) {
      * y ceder la CPU.
      */
     while (child->state != PROCESS_TERMINATED) {
-        parent->waitingForChildPid = childPid;
-        parent->state = PROCESS_BLOCKED;
+        if (parent == NULL) {
+#if __STDC_HOSTED__
+            restoreInterrupts(flags);
+            return 0;
+#else
+            /*
+             * La shell no tiene PCB. Espera al siguiente
+             * interrupt sin impedir el avance del scheduler.
+             */
+            restoreInterrupts(flags);
+            return 0;
+#endif
+        } else {
+            parent->waitingForChildPid = childPid;
+            parent->state = PROCESS_BLOCKED;
 
 #if __STDC_HOSTED__
-        /*
-         * Los tests de Linux no pueden ejecutar INT 0x81.
-         * Devuelve 0 para permitir simular la espera.
-         */
-        restoreInterrupts(flags);
-        return 0;
+            restoreInterrupts(flags);
+            return 0;
 #else
-        __asm__ volatile ("int $0x81" ::: "memory");
+            __asm__ volatile ("int $0x81" ::: "memory");
 #endif
+        }
     }
 
     /*
      * El hijo termino y el padre ya puede recogerlo.
      */
-    parent->waitingForChildPid = 0;
+    if (parent != NULL) {
+        parent->waitingForChildPid = 0;
+    }
+
+    /*
+     * Ctrl+C solo marca procesos como terminados.
+     * Cerrar sus recursos ahora, fuera de IRQ1.
+     * La limpieza es segura tambien tras un exit normal.
+     */
+    pipeCleanupProcess(child);
+    semCancelWaiter(childPid);
 
     if (!unregisterProcess(childPid)) {
         restoreInterrupts(flags);

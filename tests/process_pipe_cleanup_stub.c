@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <process.h>
 #include <processManager.h>
 #include <ioDescriptor.h>
@@ -61,4 +62,11 @@ void pipeCloseAllDescriptors(IODescriptor *table) {
 
 void pipeCleanupProcess(Process *process) {
     (void)process;
+}
+
+/* Stub para tests que no enlazan el subsistema real de semaforos. */
+__attribute__((weak))
+uint8_t semCancelWaiter(uint64_t pid) {
+    (void)pid;
+    return 0;
 }

@@ -5,6 +5,8 @@
 #include <ioDescriptor.h>
 #include <processManager.h>
 #include <keyboard.h>
+#include <processTable.h>
+#include <criticalSection.h>
 #include <terminal.h>
 
 /*
@@ -157,14 +159,51 @@ uint64_t ioRead(uint64_t fd, char *buffer, uint64_t count) {
 
     switch (descriptor.type) {
         case IO_DESCRIPTOR_KEYBOARD: {
-            uint64_t readCount = 0;
+            Process *current = getCurrentProcess();
 
-            while (readCount < count &&
-                   keyboardReadChar(&buffer[readCount])) {
-                readCount++;
+            if (current == NULL) {
+                for (uint64_t i = 0; i < MAX_PROCESSES; i++) {
+                    Process *p = getProcessAt(i);
+
+                    if (p != NULL && p->foreground &&
+                        p->state != PROCESS_TERMINATED) {
+                        return 0;
+                    }
+                }
+
+                uint64_t n = 0;
+
+                while (n < count) {
+                    uint8_t result = keyboardReadChar(&buffer[n]);
+
+                    if (result == 0 || result == 2) {
+                        break;
+                    }
+
+                    n++;
+                }
+
+                return n;
             }
 
-            return readCount;
+            if (!current->foreground) {
+                return 0;
+            }
+
+            for (;;) {
+                uint64_t flags = enterCriticalSection();
+                uint8_t result = keyboardReadChar(buffer);
+
+                if (result != 0) {
+                    leaveCriticalSection(flags);
+                    return result == 2 ? 0 : 1;
+                }
+
+                keyboardSetWaitingProcess(current->pid);
+                blockProcess(current->pid);
+                keyboardSetWaitingProcess(0);
+                leaveCriticalSection(flags);
+            }
         }
 
         case IO_DESCRIPTOR_PIPE:

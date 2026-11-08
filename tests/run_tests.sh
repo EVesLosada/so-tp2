@@ -108,6 +108,7 @@ run_test test_semaphore_cancel \
 
 run_test test_io_descriptors \
     tests/test_io_descriptors.c \
+    tests/keyboard_io_test_stubs.c \
     Kernel/ioDescriptor.c
 
 echo "OK: todos los tests auxiliares superados"
@@ -155,6 +156,7 @@ run_test test_pipe_close \
 
 run_test test_pipe_integration \
     tests/test_pipe_integration.c \
+    tests/keyboard_io_test_stubs.c \
     Kernel/ioDescriptor.c \
     Kernel/pipe.c \
     Kernel/pipeIO.c \
@@ -163,6 +165,7 @@ run_test test_pipe_integration \
 
 run_test test_pipe_process_lifecycle \
     tests/test_pipe_process_lifecycle.c \
+    tests/keyboard_io_test_stubs.c \
     Kernel/processManager.c \
     Kernel/processTable.c \
     Kernel/ioDescriptor.c \
