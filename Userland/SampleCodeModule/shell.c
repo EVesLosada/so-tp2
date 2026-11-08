@@ -502,6 +502,14 @@ static ShellProgramEntry findShellProgram(const char *name) {
         return shellTestMmProcess;
     }
 
+    if (stringsEqual(name, "test_proc")) {
+        return shellTestProcProcess;
+    }
+
+    if (stringsEqual(name, "test_prio")) {
+        return shellTestPrioProcess;
+    }
+
     return 0;
 }
 
