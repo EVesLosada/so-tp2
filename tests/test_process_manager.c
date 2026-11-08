@@ -216,6 +216,65 @@ static void testPipeAuthorizedWakeup(void) {
     puts("OK: desbloqueo autorizado de pipes");
 }
 
+/*
+ * Verifica que las reservas de Userland no sobrevivan
+ * a la terminacion de su proceso propietario.
+ */
+static void testProcessMemoryCleanup(void) {
+    initializeProcessManager();
+
+    uint64_t pid = createProcess(
+        "memoria_exit", dummyEntry, 1, 0, 0
+    );
+    assert(pid != 0);
+
+    uint64_t shellRsp = 0x55550000ULL;
+    uint64_t processRsp = schedule(shellRsp);
+
+    assert(getCurrentProcess() != NULL);
+    assert(getCurrentProcess()->pid == pid);
+
+    void *released = allocateProcessMemory(128);
+    assert(released != NULL);
+    freeProcessMemory(released);
+
+    /* Solo deben quedar PCB y stack. */
+    assert(activeAllocations == 2);
+
+    void *pending = allocateProcessMemory(512);
+    assert(pending != NULL);
+    assert(activeAllocations > 2);
+
+    /* Finalizacion normal. */
+    assert(exitCurrentProcess() == 1);
+    assert(schedule(processRsp) == shellRsp);
+    assert(getCurrentProcess() == NULL);
+
+    assert(reapTerminatedProcesses() == 1);
+    assert(activeAllocations == 0);
+
+    /* Terminacion externa con kill. */
+    pid = createProcess(
+        "memoria_kill", dummyEntry, 1, 0, 0
+    );
+    assert(pid != 0);
+
+    processRsp = schedule(shellRsp);
+
+    pending = allocateProcessMemory(1024);
+    assert(pending != NULL);
+
+    /* Dejar el proceso READY para poder terminarlo. */
+    assert(schedule(processRsp) == shellRsp);
+    assert(getCurrentProcess() == NULL);
+
+    assert(terminateProcess(pid) == 1);
+    assert(reapTerminatedProcesses() == 1);
+    assert(activeAllocations == 0);
+
+    puts("OK: reservas liberadas tras exit y kill");
+}
+
 int main(void) {
     initializeProcessManager();
 
@@ -751,6 +810,7 @@ int main(void) {
 
     puts("OK: cambios de prioridad superados");
 
+    testProcessMemoryCleanup();
     puts("OK: pruebas del administrador de procesos superadas");
     testPipeAuthorizedWakeup();
     testProcessSnapshot();

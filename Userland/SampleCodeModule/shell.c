@@ -430,6 +430,7 @@ static void printHelp(void) {
     print("  crack     - buscar password\n");
     print("  echo      - imprimir argumentos\n");
     print("  mem       - mostrar estado de memoria\n");
+    print("  test_mm N - probar memoria (maximo N bytes)\n");
     print("  ps        - listar procesos\n");
     print("  loop      - proceso repetitivo\n");
     print("  kill PID  - terminar proceso\n");
@@ -471,6 +472,10 @@ static ShellProgramEntry findShellProgram(const char *name) {
 
     if (stringsEqual(name, "loop")) {
         return shellLoopProcess;
+    }
+
+    if (stringsEqual(name, "test_mm")) {
+        return shellTestMmProcess;
     }
 
     return 0;

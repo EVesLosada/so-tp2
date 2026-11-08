@@ -64,6 +64,7 @@ static char translateShift(uint8_t scancode, char base) {
         case 0x09: return '(';
         case 0x0A: return ')';
         case 0x0B: return '=';
+        case 0x0C: return '_';
         default:   return base;
     }
 }

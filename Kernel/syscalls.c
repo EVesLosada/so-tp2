@@ -263,7 +263,7 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
          * RAX = direccion reservada o NULL.
          */
         case SYS_MALLOC:
-            return (uint64_t)allocateMemory(frame->rdi);
+            return (uint64_t)allocateProcessMemory(frame->rdi);
 
         /*
          * Liberar un bloque previamente reservado.
@@ -271,7 +271,7 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
          * RDI = direccion del bloque.
          */
         case SYS_FREE:
-            freeMemory((void *)(uintptr_t)frame->rdi);
+            freeProcessMemory((void *)(uintptr_t)frame->rdi);
             return 0;
 
         /*

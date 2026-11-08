@@ -76,6 +76,10 @@ Process *selectNextReadyProcess(void);
  */
 Process *getCurrentProcess(void);
 
+/* Memoria de Userland con seguimiento por proceso. */
+void *allocateProcessMemory(uint64_t size);
+void freeProcessMemory(void *ptr);
+
 /*
  * Copia hasta capacity procesos registrados en destination.
  * Retorna la cantidad de entradas copiadas.

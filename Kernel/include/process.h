@@ -16,6 +16,8 @@
  * No debe confundirse con ProcessInfo, que es
  * la estructura publica utilizada por Userland.
  */
+struct ProcessAllocation;
+
 typedef struct Process {
     uint64_t pid;
     char name[PROCESS_NAME_MAX_LENGTH];
@@ -83,6 +85,9 @@ typedef struct Process {
      * Cada proceso posee sus propias entradas.
      */
     IODescriptor ioDescriptors[MAX_PROCESS_DESCRIPTORS];
+
+    /* Reservas dinamicas propiedad de este proceso. */
+    struct ProcessAllocation *allocations;
 
 } Process;
 

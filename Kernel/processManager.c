@@ -123,6 +123,112 @@ static void processBootstrap(Process *process) {
     }
 }
 
+/*
+ * Cada reserva de Userland pertenece al proceso
+ * que ejecuto SYS_MALLOC.
+ */
+typedef struct ProcessAllocation {
+    void *ptr;
+    struct ProcessAllocation *next;
+} ProcessAllocation;
+
+void *allocateProcessMemory(uint64_t size) {
+    uint64_t flags = saveAndDisableInterrupts();
+    Process *process = currentProcess;
+
+    /*
+     * La shell original todavia no tiene PCB.
+     * Conservar su comportamiento anterior.
+     */
+    if (process == NULL) {
+        void *ptr = allocateMemory(size);
+        restoreInterrupts(flags);
+        return ptr;
+    }
+
+    if (size == 0) {
+        restoreInterrupts(flags);
+        return NULL;
+    }
+
+    ProcessAllocation *record =
+        allocateMemory(sizeof(ProcessAllocation));
+
+    if (record == NULL) {
+        restoreInterrupts(flags);
+        return NULL;
+    }
+
+    void *ptr = allocateMemory(size);
+
+    if (ptr == NULL) {
+        freeMemory(record);
+        restoreInterrupts(flags);
+        return NULL;
+    }
+
+    record->ptr = ptr;
+    record->next = process->allocations;
+    process->allocations = record;
+
+    restoreInterrupts(flags);
+    return ptr;
+}
+
+void freeProcessMemory(void *ptr) {
+    uint64_t flags = saveAndDisableInterrupts();
+    Process *process = currentProcess;
+
+    if (ptr == NULL) {
+        restoreInterrupts(flags);
+        return;
+    }
+
+    if (process == NULL) {
+        freeMemory(ptr);
+        restoreInterrupts(flags);
+        return;
+    }
+
+    ProcessAllocation **link = &process->allocations;
+
+    while (*link != NULL && (*link)->ptr != ptr) {
+        link = &(*link)->next;
+    }
+
+    /*
+     * No permitir que un proceso libere una
+     * reserva perteneciente a otro.
+     */
+    if (*link != NULL) {
+        ProcessAllocation *record = *link;
+        *link = record->next;
+
+        freeMemory(record->ptr);
+        freeMemory(record);
+    }
+
+    restoreInterrupts(flags);
+}
+
+/*
+ * Ejecutar solo cuando el proceso ya no
+ * puede volver a utilizar sus reservas.
+ */
+static void releaseProcessMemory(Process *process) {
+    ProcessAllocation *record = process->allocations;
+    process->allocations = NULL;
+
+    while (record != NULL) {
+        ProcessAllocation *next = record->next;
+
+        freeMemory(record->ptr);
+        freeMemory(record);
+
+        record = next;
+    }
+}
+
 void initializeProcessManager(void) {
     initializeProcessTable();
     nextPid = 1;
@@ -838,6 +944,7 @@ uint64_t reapTerminatedProcesses(void) {
          * Ya no esta registrado ni ejecutandose:
          * podemos liberar su stack y su PCB.
          */
+        releaseProcessMemory(process);
         freeMemory(stack);
         freeMemory(process);
 
@@ -901,6 +1008,7 @@ uint64_t waitForChild(uint64_t childPid) {
 
     void *stack = child->stackBase;
 
+    releaseProcessMemory(child);
     freeMemory(stack);
     freeMemory(child);
 
