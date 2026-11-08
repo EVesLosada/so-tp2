@@ -19,9 +19,22 @@ static uint64_t fakeTicks;
 static uint64_t yieldCount;
 static jmp_buf loopJump;
 
+static const char *inputData = "";
+static uint64_t inputLength;
+static uint64_t inputPosition;
+static uint64_t inputChunkLimit;
+static uint64_t outputChunkLimit;
+
 static void resetOutput(void) {
     outputLength = 0;
     output[0] = '\0';
+}
+
+static void setInput(const char *data, uint64_t chunkLimit) {
+    inputData = data;
+    inputLength = strlen(data);
+    inputPosition = 0;
+    inputChunkLimit = chunkLimit;
 }
 
 /* Simulacion de escritura en la terminal. */
@@ -32,6 +45,11 @@ uint64_t sysWrite(
 ) {
     assert(fd == STDOUT);
     assert(buffer != NULL);
+
+    if (outputChunkLimit > 0 && count > outputChunkLimit) {
+        count = outputChunkLimit;
+    }
+
     assert(outputLength + count < OUTPUT_CAPACITY);
 
     memcpy(output + outputLength, buffer, (size_t)count);
@@ -48,10 +66,31 @@ uint64_t sysRead(
     char *buffer,
     uint64_t count
 ) {
-    (void)fd;
-    (void)buffer;
-    (void)count;
-    return 0;
+    assert(fd == STDIN);
+    assert(buffer != NULL);
+
+    if (inputPosition >= inputLength) {
+        return 0;
+    }
+
+    uint64_t remaining = inputLength - inputPosition;
+    uint64_t bytesToRead =
+        count < remaining ? count : remaining;
+
+    if (inputChunkLimit > 0 &&
+        bytesToRead > inputChunkLimit) {
+        bytesToRead = inputChunkLimit;
+    }
+
+    memcpy(
+        buffer,
+        inputData + inputPosition,
+        (size_t)bytesToRead
+    );
+
+    inputPosition += bytesToRead;
+
+    return bytesToRead;
 }
 
 /* Simulacion de informacion de memoria. */
@@ -176,6 +215,53 @@ static void testPs(void) {
     puts("OK: ps muestra procesos y lista vacia");
 }
 
+static void testCat(void) {
+    char *argv[] = {"cat", NULL};
+
+    setInput("primera linea\nsegunda linea\n", 5);
+    resetOutput();
+
+    /* Simular escrituras parciales en STDOUT. */
+    outputChunkLimit = 2;
+
+    shellCatProcess(1, argv);
+
+    outputChunkLimit = 0;
+
+    assert(strcmp(
+        output,
+        "primera linea\nsegunda linea\n"
+    ) == 0);
+
+    puts("OK: cat copia STDIN a STDOUT y maneja escrituras parciales");
+}
+
+static void testWc(void) {
+    char *argv[] = {"wc", NULL};
+
+    setInput("uno\ndos\nsin salto", 2);
+    resetOutput();
+
+    shellWcProcess(1, argv);
+
+    assert(strcmp(output, "2\n") == 0);
+
+    puts("OK: wc cuenta lineas incluso entre lecturas parciales");
+}
+
+static void testFilter(void) {
+    char *argv[] = {"filter", NULL};
+
+    setInput("Hola Mundo!\nAEIOU xyz", 3);
+    resetOutput();
+
+    shellFilterProcess(1, argv);
+
+    assert(strcmp(output, "Hl Mnd!\n xyz") == 0);
+
+    puts("OK: filter elimina vocales mayusculas y minusculas");
+}
+
 static void testLoop(void) {
     char *argv[] = {"loop", NULL};
 
@@ -217,6 +303,9 @@ static void testLoop(void) {
 int main(void) {
     testMem();
     testPs();
+    testCat();
+    testWc();
+    testFilter();
     testLoop();
 
     puts("OK: test_shell_programs");

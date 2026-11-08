@@ -111,6 +111,10 @@ run_test test_io_descriptors \
     tests/keyboard_io_test_stubs.c \
     Kernel/ioDescriptor.c
 
+run_test test_keyboard_ctrl_c \
+    tests/test_keyboard_ctrl_c.c \
+    Kernel/drivers/keyboard.c
+
 echo "OK: todos los tests auxiliares superados"
 
 
@@ -193,5 +197,7 @@ run_test test_shell_parser \
 
     run_test test_shell_programs \
         tests/test_shell_programs.c \
-        Userland/SampleCodeModule/shellPrograms.c
+        Userland/SampleCodeModule/shellPrograms.c \
+        Userland/SampleCodeModule/wc.c \
+        Userland/SampleCodeModule/filter.c
 )

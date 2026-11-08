@@ -5,6 +5,7 @@
 #include <processTable.h>
 #include <pipeClose.h>
 #include <semaphore.h>
+#include <terminal.h>
 
 #define KEYBOARD_BUFFER_SIZE 128
 
@@ -100,8 +101,9 @@ static void enqueueCharacter(char character) {
 
 static void stopForegroundProcesses(void) {
     /*
-     * La shell es un proceso foreground con parentPid == 0.
-     * Ctrl+C debe terminar a sus hijos, nunca a la shell.
+     * La shell no tiene PCB: sus procesos foreground tienen
+     * parentPid == 0. Ctrl+C debe terminarlos, pero nunca
+     * debe afectar a los procesos background.
      *
      * La limpieza de recursos se realiza fuera de IRQ1.
      */

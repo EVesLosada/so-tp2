@@ -396,9 +396,13 @@ static void shellReapBackgroundChildren(void) {
         }
 
         if (reaped || !found) {
-            if (reaped) {
-                shellMarkPipelineChildFinished(pid);
-            }
+            /*
+             * Si el PID ya no aparece en sysPs, el kernel
+             * ya lo retiro de la tabla de procesos.
+             * En ambos casos el hijo dejo de existir.
+             */
+            shellMarkPipelineChildFinished(pid);
+
             backgroundCount--;
             backgroundPids[i] =
                 backgroundPids[backgroundCount];
@@ -429,6 +433,7 @@ static void printHelp(void) {
     print("  gethash   - mostrar hash\n");
     print("  crack     - buscar password\n");
     print("  echo      - imprimir argumentos\n");
+    print("  cat       - copiar STDIN a STDOUT\n");
     print("  wc        - contar lineas de STDIN\n");
     print("  filter    - eliminar vocales de STDIN\n");
     print("  mem       - mostrar estado de memoria\n");
@@ -440,6 +445,15 @@ static void printHelp(void) {
     print("  block PID - bloquear proceso\n");
     print("  unblock P - desbloquear proceso\n");
     print("  jobs      - procesos en background\n");
+
+    print("\nPipelines y control:\n");
+    print("  comando1 | comando2 - conectar STDOUT con STDIN\n");
+    print("  comando &            - ejecutar en background\n");
+    print("  Ctrl+C               - terminar procesos foreground\n");
+    print("  Ctrl+D               - enviar EOF a quien lee STDIN\n");
+    print("  Ctrl+P               - escribir el operador |\n");
+    print("  F6                   - escribir el operador | (alternativa)\n");
+    print("  Shift+-              - escribir el caracter _\n");
 }
 
 /*
