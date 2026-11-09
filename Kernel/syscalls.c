@@ -178,16 +178,16 @@ static uint64_t sysCrack(char *resultBuffer,
 uint64_t syscallDispatcher(RegisterFrame *frame) {
 
     /*
-     * La shell todavia no tiene PCB.
+     * La shell es un proceso real con PID 1.
      *
-     * Cuando atiende una syscall, aprovechamos para
-     * recuperar los recursos de procesos terminados.
+     * Aprovechamos sus syscalls para liberar procesos
+     * terminados que ya pueden ser recolectados.
      *
-     * No hacemos esta limpieza desde el timer:
-     * liberar memoria durante una interrupcion de
-     * planificacion podria ser peligroso.
+     * No hacemos esta limpieza desde el timer.
      */
-    if (getCurrentProcess() == NULL) {
+    Process *current = getCurrentProcess();
+
+    if (current != NULL && current->pid == 1) {
         reapTerminatedProcesses();
     }
 
