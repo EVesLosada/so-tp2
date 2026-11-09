@@ -441,7 +441,7 @@ static void printHelp(void) {
     print("  loop      - proceso repetitivo\n");
     print("  kill PID  - terminar proceso\n");
     print("  nice P N  - cambiar prioridad (1-5)\n");
-    print("  block PID - bloquear proceso\n");
+    print("  block PID - bloquear/desbloquear proceso\n");
     print("  unblock P - desbloquear proceso\n");
     print("  jobs      - procesos en background\n");
 

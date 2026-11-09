@@ -90,7 +90,7 @@ Estas pruebas son complementarias y no reemplazan la ejecución del kernel en QE
 | `loop` | Imprime periódicamente su PID |
 | `kill PID` | Termina el proceso indicado |
 | `nice PID PRIORIDAD` | Modifica la prioridad entre 1 y 5 |
-| `block PID` | Bloquea un proceso |
+| `block PID` | Alterna entre bloquear y desbloquear un proceso |
 | `unblock PID` | Desbloquea un proceso |
 | `jobs` | Muestra trabajos en background |
 | `echo TEXTO` | Imprime argumentos |
