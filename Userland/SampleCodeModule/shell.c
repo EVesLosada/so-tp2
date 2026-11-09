@@ -514,6 +514,10 @@ static ShellProgramEntry findShellProgram(const char *name) {
         return shellTestSyncProcess;
     }
 
+    if (stringsEqual(name, "mvar")) {
+        return shellMvarProcess;
+    }
+
     return 0;
 }
 

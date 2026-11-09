@@ -235,19 +235,70 @@ static uint8_t runMvarTest(void) {
 /*
  * Comando de la shell.
  */
+uint8_t runSyncPairs(
+    uint64_t pairs,
+    uint8_t withSemaphores,
+    uint64_t iterations
+);
+
+static uint8_t parseSyncNumber(
+    const char *text,
+    uint64_t limit,
+    uint64_t *result
+) {
+    uint64_t value = 0;
+
+    if (text == 0 || text[0] == '\0' || result == 0) {
+        return 0;
+    }
+
+    for (uint64_t i = 0; text[i] != '\0'; i++) {
+        if (text[i] < '0' || text[i] > '9') {
+            return 0;
+        }
+
+        uint64_t digit = text[i] - '0';
+
+        if (digit > limit ||
+            value > (limit - digit) / 10) {
+            return 0;
+        }
+
+        value = value * 10 + digit;
+    }
+
+    *result = value;
+    return 1;
+}
+
 void shellTestSyncProcess(uint64_t argc, char **argv) {
-    (void)argc;
-    (void)argv;
+    if (argc == 1) {
+        testSyncPrint("Iniciando test_sync...\n");
 
-    testSyncPrint("Iniciando test_sync...\n");
+        if (!runSemaphoreTest() || !runMvarTest()) {
+            return;
+        }
 
-    if (!runSemaphoreTest()) {
+        testSyncPrint("OK: test_sync superado\n");
         return;
     }
 
-    if (!runMvarTest()) {
+    uint64_t pairs;
+    uint64_t useSem;
+    uint64_t iterations;
+
+    if (argc != 4 || argv == 0 ||
+        !parseSyncNumber(argv[1], 8, &pairs) ||
+        !parseSyncNumber(argv[2], 50000, &iterations) ||
+        !parseSyncNumber(argv[3], 1, &useSem) ||
+        pairs == 0 || iterations == 0) {
+        testSyncPrint(
+            "Uso: test_sync <pares 1..8> <iteraciones 1..50000> <semaforos 0|1>\n"
+        );
         return;
     }
 
-    testSyncPrint("OK: test_sync superado\n");
+    if (runSyncPairs(pairs, (uint8_t)useSem, iterations)) {
+        testSyncPrint("OK: test_sync superado\n");
+    }
 }
