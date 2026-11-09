@@ -222,12 +222,15 @@ void keyboardProcessScancode(uint8_t scancode, RegisterFrame *frame) {
 }
 
 uint8_t keyboardReadChar(char *character) {
-    if (character == 0 || readPosition == writePosition) {
+    uint64_t currentRead = readPosition;
+    uint64_t currentWrite = writePosition;
+
+    if (character == 0 || currentRead == currentWrite) {
         return 0;
     }
 
-    *character = keyboardBuffer[readPosition];
-    readPosition = (readPosition + 1) % KEYBOARD_BUFFER_SIZE;
+    *character = keyboardBuffer[currentRead];
+    readPosition = (currentRead + 1) % KEYBOARD_BUFFER_SIZE;
 
     return *character == 4 ? 2 : 1;
 }

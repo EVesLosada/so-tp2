@@ -82,7 +82,6 @@ uint64_t pipeReadBlocking(
             pipeRemoveWaiter(pipe, PIPE_READ, current->pid);
 
             current->waitingPipeId = 0;
-            current->waitingPipeMode = PIPE_READ;
 
             leaveCriticalSection(flags);
             return 0;

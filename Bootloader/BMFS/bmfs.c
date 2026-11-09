@@ -3,6 +3,7 @@
 
 /* Global includes */
 #include <stdio.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -39,7 +40,7 @@ struct BMFSEntry entry;
 void *pentry = &entry;
 char *BlockMap;
 char *FileBlocks;
-char Directory[4096];
+char Directory[4096] __attribute__((aligned(__alignof__(struct BMFSEntry))));
 char DiskInfo[512];
 
 /* Built-in functions */
@@ -233,7 +234,7 @@ void list()
 {
 	int tint;
 
-	printf("%s\nDisk Size: %d MiB\n", diskname, disksize);
+	printf("%s\nDisk Size: %u MiB\n", diskname, disksize);
 	printf("Name                            |            Size (B)|      Reserved (MiB)\n");
 	printf("==========================================================================\n");
 	for (tint = 0; tint < 64; tint++)			// Max 64 entries
@@ -249,7 +250,7 @@ void list()
 		}
 		else										// Valid entry
 		{
-			printf("%-32s %20lld %20lld\n", entry.FileName, entry.FileSize, (entry.ReservedBlocks*2));
+			printf("%-32s %20llu %20llu\n", entry.FileName, entry.FileSize, (entry.ReservedBlocks*2));
 		}
 	}
 }
@@ -364,7 +365,7 @@ int initialize(char *diskname, char *size, char *mbr, char *boot, char *kernel)
 	{
 		while (diskSizeFactor--)
 		{
-			if (diskSize * 1024 > diskSize ) // Make sure we don't overflow
+			if (diskSize <= ULLONG_MAX / 1024ULL) // Make sure we don't overflow
 			{
 				diskSize *= 1024;
 			}
@@ -403,7 +404,8 @@ int initialize(char *diskname, char *size, char *mbr, char *boot, char *kernel)
 		bootFile = fopen(boot, "rb");
 		if (bootFile == NULL )
 		{
-			printf("Error: Unable to open %s file '%s'\n", bootFileType, boot);
+			printf("Error: Unable to open %s file '%s'\n",
+                   bootFileType != NULL ? bootFileType : "boot loader", boot);
 			ret = 1;
 		}
 	}
@@ -444,7 +446,7 @@ int initialize(char *diskname, char *size, char *mbr, char *boot, char *kernel)
 	}
 
 	// Fill the disk image with zeros.
-	if (ret == 0)
+	if (ret == 0 && buffer != NULL && disk != NULL)
 	{
 		double percent;
 		memset(buffer, 0, bufferSize);
@@ -456,7 +458,7 @@ int initialize(char *diskname, char *size, char *mbr, char *boot, char *kernel)
 			percent *= 100;
 			printf("Formatting disk: %llu of %llu bytes (%.0f%%)...\r", writeSize, diskSize, percent);
 			chunkSize = bufferSize;
-			if (chunkSize > diskSize - writeSize)
+			if (chunkSize > diskSize || writeSize > diskSize - chunkSize)
 			{
 				chunkSize = diskSize - writeSize;
 			}
@@ -475,14 +477,14 @@ int initialize(char *diskname, char *size, char *mbr, char *boot, char *kernel)
 	}
 
 	// Format the disk.
-	if (ret == 0)
+	if (ret == 0 && disk != NULL)
 	{
 		rewind(disk);
 		format();
 	}
 
 	// Write the master boot record if it was specified by the caller.
-	if (ret == 0 && mbrFile !=NULL)
+	if (ret == 0 && mbrFile != NULL && mbr != NULL && disk != NULL && buffer != NULL)
 	{
 		printf("Writing master boot record.\n");
 		fseek(disk, 0, SEEK_SET);
@@ -502,7 +504,7 @@ int initialize(char *diskname, char *size, char *mbr, char *boot, char *kernel)
 	}
 
 	// Write the boot loader if it was specified by the caller.
-	if (ret == 0 && bootFile !=NULL)
+	if (ret == 0 && bootFile != NULL && bootFileType != NULL)
 	{
 		printf("Writing %s file.\n", bootFileType);
 		fseek(disk, 8192, SEEK_SET);
@@ -547,7 +549,7 @@ int initialize(char *diskname, char *size, char *mbr, char *boot, char *kernel)
 			}
 			else
 			{
-				if (ferror(disk))
+				if (ferror(kernelFile))
 				{
 					printf("Error: Failed to read file '%s'\n", kernel);
 					ret = 1;
@@ -617,7 +619,7 @@ void create(char *filename, unsigned long long maxsize)
 	{
 		unsigned long long blocks_requested = maxsize / 2; // how many blocks to allocate
 		unsigned long long num_blocks = disksize / 2; // number of blocks in the disk
-		char dir_copy[4096]; // copy of directory
+		char dir_copy[4096] __attribute__((aligned(__alignof__(struct BMFSEntry)))); // copy of directory
 		int num_used_entries = 0; // how many entries of Directory are either used or deleted
 		int first_free_entry = -1; // where to put new entry
 		int tint;
@@ -684,7 +686,7 @@ void create(char *filename, unsigned long long maxsize)
 
 		if (new_file_start == 0) 
 		{
-			printf("Cannot create file of size %lld MiB.\n", maxsize);
+			printf("Cannot create file of size %llu MiB.\n", maxsize);
 			return;
 		}
 
