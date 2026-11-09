@@ -201,3 +201,16 @@ run_test test_shell_parser \
         Userland/SampleCodeModule/wc.c \
         Userland/SampleCodeModule/filter.c
 )
+
+echo "=== test_mvar ==="
+MVAR_TEST_BIN="/tmp/test_mvar_tp2_$$"
+
+"${CC:-cc}" -std=c99 -Wall -Wextra -Werror \
+    -IUserland/SampleCodeModule/include \
+    -IShared/include \
+    tests/test_mvar.c \
+    Userland/SampleCodeModule/mvar.c \
+    -o "$MVAR_TEST_BIN" || exit 1
+
+"$MVAR_TEST_BIN" || exit 1
+rm -f "$MVAR_TEST_BIN"

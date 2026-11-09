@@ -510,6 +510,10 @@ static ShellProgramEntry findShellProgram(const char *name) {
         return shellTestPrioProcess;
     }
 
+    if (stringsEqual(name, "test_sync")) {
+        return shellTestSyncProcess;
+    }
+
     return 0;
 }
 

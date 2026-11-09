@@ -14,4 +14,6 @@ void shellTestMmProcess(uint64_t argc, char **argv);
 void shellTestProcProcess(uint64_t argc, char **argv);
 void shellTestPrioProcess(uint64_t argc, char **argv);
 
+void shellTestSyncProcess(uint64_t argc, char **argv);
+
 #endif
