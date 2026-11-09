@@ -1,7 +1,7 @@
 
 .DEFAULT_GOAL := all
 
-.PHONY: all toolchain bootloader kernel userland image clean docker run
+.PHONY: all toolchain bootloader kernel userland image clean docker run freelist buddy
 
 all: image
 
@@ -19,6 +19,16 @@ userland:
 
 image: toolchain bootloader kernel userland
 	$(MAKE) -C Image all
+
+# Compilar seleccionando el administrador de memoria.
+# Limpiar antes para evitar reutilizar objetos del otro modo.
+freelist:
+	$(MAKE) clean
+	$(MAKE) MEMORY_MANAGER=freelist all
+
+buddy:
+	$(MAKE) clean
+	$(MAKE) MEMORY_MANAGER=buddy all
 
 clean:
 	$(MAKE) -C Bootloader clean

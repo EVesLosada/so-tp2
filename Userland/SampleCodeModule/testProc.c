@@ -95,6 +95,15 @@ void shellTestProcProcess(uint64_t argc, char **argv) {
         return;
     }
 
+    ProcessInfo parentInfo;
+
+    if (!findProcess(sysGetPid(), &parentInfo)) {
+        printError("ERROR test_proc: proceso no encontrado\n");
+        return;
+    }
+
+    uint8_t childForeground = parentInfo.foreground;
+
     randomState = sysGetTicks() ^ sysGetPid() ^ 0x9E3779B97F4A7C15ULL;
 
     if (randomState == 0) {
@@ -122,7 +131,7 @@ void shellTestProcProcess(uint64_t argc, char **argv) {
                 "test_proc_dummy",
                 dummyWorker,
                 1,
-                1,
+                childForeground,
                 0,
                 0
             );

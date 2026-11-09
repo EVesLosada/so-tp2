@@ -437,7 +437,6 @@ static void printHelp(void) {
     print("  wc        - contar lineas de STDIN\n");
     print("  filter    - eliminar vocales de STDIN\n");
     print("  mem       - mostrar estado de memoria\n");
-    print("  test_mm N - probar memoria (maximo N bytes)\n");
     print("  ps        - listar procesos\n");
     print("  loop      - proceso repetitivo\n");
     print("  kill PID  - terminar proceso\n");
@@ -445,6 +444,13 @@ static void printHelp(void) {
     print("  block PID - bloquear proceso\n");
     print("  unblock P - desbloquear proceso\n");
     print("  jobs      - procesos en background\n");
+
+    print("\nTests de la catedra:\n");
+    print("  test_mm N       - memoria (maximo N bytes)\n");
+    print("  test_proc N     - procesos (1 a 16)\n");
+    print("  test_prio N     - prioridades (objetivo)\n");
+    print("  test_sync P I S - sincronizacion (pares, iteraciones, 0/1)\n");
+    print("  test_sync       - pruebas internas de semaforos y MVar\n");
 
     print("\nPipelines y control:\n");
     print("  comando1 | comando2 - conectar STDOUT con STDIN\n");
@@ -758,14 +764,45 @@ static void executeCommand(const char *command) {
             return;
         }
 
-        if (!sysBlock(pid)) {
-            print("ERROR: no se pudo bloquear el proceso\n");
+        uint64_t count = sysPs(
+            backgroundSnapshot,
+            SHELL_SNAPSHOT_CAPACITY
+        );
+
+        if (count > SHELL_SNAPSHOT_CAPACITY) {
+            count = SHELL_SNAPSHOT_CAPACITY;
+        }
+
+        for (uint64_t i = 0; i < count; i++) {
+            ProcessInfo *target = &backgroundSnapshot[i];
+
+            if (target->pid != pid) {
+                continue;
+            }
+
+            if (target->state == PROCESS_READY) {
+                if (!sysBlock(pid)) {
+                    print("ERROR: no se pudo bloquear el proceso\n");
+                    return;
+                }
+                print("Proceso bloqueado: PID ");
+            } else if (target->state == PROCESS_BLOCKED) {
+                if (!sysUnblock(pid)) {
+                    print("ERROR: proceso esperando un recurso\n");
+                    return;
+                }
+                print("Proceso desbloqueado: PID ");
+            } else {
+                print("ERROR: estado no admite block\n");
+                return;
+            }
+
+            printDecimal(pid);
+            print("\n");
             return;
         }
 
-        print("Proceso bloqueado: PID ");
-        printDecimal(pid);
-        print("\n");
+        print("ERROR: PID no encontrado\n");
         return;
     }
 

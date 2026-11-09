@@ -944,6 +944,17 @@ uint64_t reapTerminatedProcesses(void) {
         void *stack = process->stackBase;
 
         /*
+         * Limpiar recursos pendientes antes de liberar el PCB.
+         * Esto tambien cubre procesos terminados mediante Ctrl+C
+         * y procesos huerfanos que no seran recogidos con wait.
+         *
+         * La limpieza de pipes es idempotente porque desasocia
+         * los descriptores al cerrarlos.
+         */
+        pipeCleanupProcess(process);
+        semCancelWaiter(pid);
+
+        /*
          * Primero quitar el proceso de la tabla,
          * para que nadie pueda volver a encontrarlo.
          */

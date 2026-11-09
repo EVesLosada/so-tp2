@@ -25,3 +25,8 @@ Thumbs.db
 .idea/
 *.sublime-project
 *.sublime-workspace
+
+# Reportes locales y descargas auxiliares
+/pvs_*.json
+/wget-log*
+/index.html*
