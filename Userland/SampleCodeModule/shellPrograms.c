@@ -189,13 +189,6 @@ void shellPsProcess(uint64_t argc, char **argv) {
             process->foreground ? "FG" : "BG"
         );
         shellProgramPrint("\n");
-
-        shellProgramPrint("  RSP: ");
-        shellProgramPrintHex(process->stackPointer);
-
-        shellProgramPrint(" | RBP: ");
-        shellProgramPrintHex(process->basePointer);
-        shellProgramPrint("\n");
     }
 }
 
@@ -239,4 +232,157 @@ void shellLoopProcess(uint64_t argc, char **argv) {
 
         sysYield();
     }
+}
+
+static int shellProgramParsePid(const char *text, uint64_t *pid) {
+    uint64_t value = 0;
+
+    if (text == 0 || text[0] == '\0') {
+        return 0;
+    }
+
+    for (uint64_t i = 0; text[i] != '\0'; i++) {
+        if (text[i] < '0' || text[i] > '9') {
+            return 0;
+        }
+
+        uint64_t digit = text[i] - '0';
+
+        if (value > (UINT64_MAX - digit) / 10) {
+            return 0;
+        }
+
+        value = value * 10 + digit;
+    }
+
+    *pid = value;
+    return value != 0;
+}
+
+void shellKillProcess(uint64_t argc, char **argv) {
+    uint64_t pid;
+
+    if (argc != 2 ||
+        !shellProgramParsePid(argv[1], &pid)) {
+        shellProgramPrint("Uso: kill PID\n");
+        return;
+    }
+
+    if (pid == 1) {
+        shellProgramPrint("ERROR: no se puede terminar la shell\n");
+        return;
+    }
+
+    if (pid == sysGetPid()) {
+        shellProgramPrint("ERROR: no se puede terminar el propio proceso\n");
+        return;
+    }
+
+    if (!sysKill(pid)) {
+        shellProgramPrint("ERROR: no se pudo terminar el proceso\n");
+        return;
+    }
+
+    shellProgramPrint("Proceso terminado: PID ");
+    shellProgramPrintDecimal(pid);
+    shellProgramPrint("\n");
+}
+
+void shellBlockProcess(uint64_t argc, char **argv) {
+    uint64_t pid;
+
+    if (argc != 2 ||
+        !shellProgramParsePid(argv[1], &pid)) {
+        shellProgramPrint("Uso: block PID\n");
+        return;
+    }
+
+    if (pid == 1 || pid == sysGetPid()) {
+        shellProgramPrint("ERROR: no se puede bloquear este proceso\n");
+        return;
+    }
+
+    ProcessInfo processes[64];
+    uint64_t count = sysPs(processes, 64);
+
+    if (count > 64) {
+        count = 64;
+    }
+
+    for (uint64_t i = 0; i < count; i++) {
+        if (processes[i].pid != pid) {
+            continue;
+        }
+
+        if (processes[i].state == PROCESS_READY) {
+            if (!sysBlock(pid)) {
+                shellProgramPrint("ERROR: no se pudo bloquear el proceso\n");
+                return;
+            }
+
+            shellProgramPrint("Proceso bloqueado: PID ");
+        }
+        else if (processes[i].state == PROCESS_BLOCKED) {
+            if (!sysUnblock(pid)) {
+                shellProgramPrint("ERROR: proceso esperando un recurso\n");
+                return;
+            }
+
+            shellProgramPrint("Proceso desbloqueado: PID ");
+        }
+        else {
+            shellProgramPrint("ERROR: estado no admite block\n");
+            return;
+        }
+
+        shellProgramPrintDecimal(pid);
+        shellProgramPrint("\n");
+        return;
+    }
+
+    shellProgramPrint("ERROR: PID no encontrado\n");
+}
+
+void shellNiceProcess(uint64_t argc, char **argv) {
+    uint64_t pid;
+    uint64_t priority;
+
+    if (argc != 3 ||
+        !shellProgramParsePid(argv[1], &pid) ||
+        !shellProgramParsePid(argv[2], &priority) ||
+        priority < 1 ||
+        priority > 5) {
+        shellProgramPrint("Uso: nice PID PRIORIDAD (1-5)\n");
+        return;
+    }
+
+    if (!sysNice(pid, priority)) {
+        shellProgramPrint("ERROR: no se pudo cambiar la prioridad\n");
+        return;
+    }
+
+    shellProgramPrint("Prioridad actualizada - PID ");
+    shellProgramPrintDecimal(pid);
+    shellProgramPrint(" - Prioridad ");
+    shellProgramPrintDecimal(priority);
+    shellProgramPrint("\n");
+}
+
+void shellUnblockProcess(uint64_t argc, char **argv) {
+    uint64_t pid;
+
+    if (argc != 2 ||
+        !shellProgramParsePid(argv[1], &pid)) {
+        shellProgramPrint("Uso: unblock PID\n");
+        return;
+    }
+
+    if (!sysUnblock(pid)) {
+        shellProgramPrint("ERROR: no se pudo desbloquear el proceso\n");
+        return;
+    }
+
+    shellProgramPrint("Proceso desbloqueado: PID ");
+    shellProgramPrintDecimal(pid);
+    shellProgramPrint("\n");
 }

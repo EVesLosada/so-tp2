@@ -516,13 +516,11 @@ uint64_t syscallDispatcher(RegisterFrame *frame) {
             return unblockProcess(frame->rdi);
 
         /*
-         * Ceder voluntariamente la CPU.
-         * INT 0x81 guarda el contexto y ejecuta el scheduler.
-         */
+        * Ceder voluntariamente la CPU.
+        * INT 0x81 guarda el contexto y ejecuta el scheduler.
+        */
         case SYS_YIELD:
-#if !__STDC_HOSTED__
             __asm__ volatile ("int $0x81" ::: "memory");
-#endif
             return 1;
 
         default:

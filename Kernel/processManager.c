@@ -50,9 +50,6 @@ static uint64_t schedulingWeight(uint64_t priority) {
  * una instruccion privilegiada.
  */
 static uint64_t saveAndDisableInterrupts(void) {
-#if __STDC_HOSTED__
-    return 0;
-#else
     uint64_t flags;
 
     __asm__ volatile (
@@ -65,16 +62,12 @@ static uint64_t saveAndDisableInterrupts(void) {
     );
 
     return flags;
-#endif
 }
 
 /*
  * Restaura el estado previo de las interrupciones.
  */
 static void restoreInterrupts(uint64_t flags) {
-#if __STDC_HOSTED__
-    (void)flags;
-#else
     __asm__ volatile (
         "pushq %0\n\t"
         "popfq"
@@ -82,7 +75,6 @@ static void restoreInterrupts(uint64_t flags) {
         : "r"(flags)
         : "memory", "cc"
     );
-#endif
 }
 
 /*
@@ -735,30 +727,21 @@ uint8_t exitCurrentProcess(void) {
     process->state = PROCESS_TERMINATED;
     wakeParentWaitingForChild(process);
 
-#if __STDC_HOSTED__
     /*
-     * En los tests de Linux no se puede ejecutar INT 0x81.
-     * Se permite comprobar el cambio de estado.
-     */
-    restoreInterrupts(flags);
-    return 1;
-#else
-    /*
-     * El scheduler guardara el contexto, pero nunca
-     * volvera a seleccionar este proceso terminado.
-     *
-     * Mantenemos las interrupciones deshabilitadas
-     * hasta realizar el cambio de contexto.
-     */
+    * El scheduler guardara el contexto, pero nunca
+    * volvera a seleccionar este proceso terminado.
+    *
+    * Mantenemos las interrupciones deshabilitadas
+    * hasta realizar el cambio de contexto.
+    */
     __asm__ volatile ("int $0x81" ::: "memory");
 
     /*
-     * No deberia regresar a este contexto.
-     */
+    * No deberia regresar a este contexto.
+    */
     for (;;) {
         __asm__ volatile ("cli; hlt");
     }
-#endif
 }
 
 uint8_t setProcessPriority(uint64_t pid, uint64_t priority) {
@@ -808,17 +791,7 @@ uint8_t blockProcess(uint64_t pid) {
 
         process->state = PROCESS_BLOCKED;
 
-        /*
-         * En el kernel, INT 0x81 guarda el contexto
-         * y ejecuta el scheduler inmediatamente.
-         *
-         * En los tests de Linux no ejecutamos
-         * interrupciones del kernel: el cambio de
-         * contexto se simula por separado.
-         */
-#if !__STDC_HOSTED__
         __asm__ volatile ("int $0x81" ::: "memory");
-#endif
 
         /*
          * Si otro proceso nos desbloquea y el
@@ -915,14 +888,12 @@ uint64_t reapTerminatedProcesses(void) {
         }
 
         /*
-         * En el kernel real, la shell recoge sus hijos foreground.
-         * Los tests hosted conservan la semantica original del reaper.
-         */
-#if !__STDC_HOSTED__
+        * La shell recoge sus hijos foreground.
+        * No liberarlos desde el reaper.
+        */
         if (process->parentPid == 0 && process->foreground) {
             continue;
         }
-#endif
 
         /*
          * Conservar los hijos terminados de padres vivos
@@ -1005,27 +976,13 @@ uint64_t waitForChild(uint64_t childPid) {
      */
     while (child->state != PROCESS_TERMINATED) {
         if (parent == NULL) {
-#if __STDC_HOSTED__
             restoreInterrupts(flags);
             return 0;
-#else
-            /*
-             * La shell no tiene PCB. Espera al siguiente
-             * interrupt sin impedir el avance del scheduler.
-             */
-            restoreInterrupts(flags);
-            return 0;
-#endif
         } else {
             parent->waitingForChildPid = childPid;
             parent->state = PROCESS_BLOCKED;
 
-#if __STDC_HOSTED__
-            restoreInterrupts(flags);
-            return 0;
-#else
             __asm__ volatile ("int $0x81" ::: "memory");
-#endif
         }
     }
 
